@@ -57,33 +57,50 @@ document.addEventListener("DOMContentLoaded", function() {
                     });
                 });
 
-                const payload = {
-                    journey_id: journey_details_js.journeyId,
-                    new_order: stageOrder
-                };
+                if (journey_details_js.journeyId) {
+                    const payload = {
+                        journey_id: journey_details_js.journeyId,
+                        new_order: stageOrder
+                    };
 
-                fetch(journey_details_js.rest_endpoint + `journeys/${journey_details_js.journeyId}/reorder-stages`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-WP-Nonce': window.wpApiShare.nonce
-                    },
-                    body: JSON.stringify(payload)
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        console.log('Order updated successfully!');
-                        renderStageSavedIcon(draggedStageId);
+                    fetch(journey_details_js.rest_endpoint + `journeys/${journey_details_js.journeyId}/reorder-stages`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-WP-Nonce': window.wpApiShare.nonce
+                        },
+                        body: JSON.stringify(payload)
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            console.log('Order updated successfully!');
+                            renderStageSavedIcon(draggedStageId);
 
-                    } else {
-                        console.log(data);
-                        console.error('Failed to update order.', data);
+                        } else {
+                            console.log(data);
+                            console.error('Failed to update order.', data);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Fetch error:', error);
+                    });
+                } else {
+                    if (window.stages && Array.isArray(window.stages)) {
+                        items.forEach((item, index) => {
+                            const stageId = item.getAttribute('data-id');
+                            const stage = window.stages.find(s => (s.ID == stageId || s.temp_id == stageId));
+                            
+                            if (stage) {
+                                stage.stage_order = index + 1;
+                            }
+                        });
+
+                        window.stages.sort((a, b) => (a.stage_order || 0) - (b.stage_order || 0));
                     }
-                })
-                .catch(error => {
-                    console.error('Fetch error:', error);
-                });
+
+                    renderStageSavedIcon(draggedStageId);
+                }
             }
         });
     }

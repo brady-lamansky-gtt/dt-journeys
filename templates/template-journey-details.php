@@ -57,52 +57,63 @@ usort( $stages, function ( $a, $b ) {
     return ( $a['stage_order'] ?? 0 ) <=> ( $b['stage_order'] ?? 0 );
 } );
 
+foreach ( $stages as &$stage ) {
+    foreach ( $stage_fields as $field_key => $field_config ) {
+        $field_type = $field_config['type'] ?? '';
+
+        if ( in_array( $field_type, [ 'connection', 'user_select', 'multi_select' ], true ) && ! empty( $stage[ $field_key ] ) ) {
+            if ( is_array( $stage[ $field_key ] ) ) {
+                foreach ( $stage[ $field_key ] as &$item ) {
+                    if ( is_array( $item ) ) {
+                        $item['id'] = $item['id'] ?? $item['ID'] ?? 0;
+                        $item['label'] = $item['label'] ?? $item['name'] ?? $item['post_title'] ?? '';
+                        $item['link'] = $item['link'] ?? $item['permalink'] ?? '';
+                    }
+                }
+            }
+        }
+    }
+}
+unset( $stage );
+
 ?>
 
 <!-- List Section -->
 <div id="content" class="grid-container" style="min-height: 80vh;">
     <div class="title-row title">
-        <h2 class="title-header"><?php esc_html_e( 'Edit Journey', 'disciple_tools' ); ?></h2>
-            <div class="button-container">
-            <?php if ( ! empty( $journey_id ) ) : ?>
-                <!-- Show Delete only if editing an existing journey -->
-                <button class="button button-delete" onclick="delete_journey(<?php echo esc_js( $journey_id ); ?>)">
-                    <?php esc_html_e( 'Delete Journey', 'disciple_tools' ); ?>
-                </button>
-            <?php else : ?>
-                <!-- Split Save Button with LocalStorage Mode Selection -->
-                <div class="split-button-wrapper" id="save-split-button">
-                    <button type="submit" form="journey-form" class="button split-main-btn" id="save-btn">
-                        <span id="save-btn-label"><?php esc_html_e( 'Save & Go Back', 'disciple_tools' ); ?></span>
-                    </button>
-                    <button class="button split-toggle-btn" type="button" onclick="toggle_save_dropdown(event)">
-                        <dt-icon icon="mdi:chevron-down"></dt-icon>
-                    </button>
-                    <div class="split-dropdown-menu" id="save-dropdown-menu">
-                        <button type="button" class="dropdown-item" onclick="select_save_mode('continue')">
-                            <?php esc_html_e( 'Save & Continue', 'disciple_tools' ); ?>
-                        </button>
-                        <button type="button" class="dropdown-item" onclick="select_save_mode('add_new')">
-                            <?php esc_html_e( 'Save & Add New', 'disciple_tools' ); ?>
-                        </button>
-                        <button type="button" class="dropdown-item" onclick="select_save_mode('go_back')">
-                            <?php esc_html_e( 'Save & Go Back', 'disciple_tools' ); ?>
-                        </button>
-                    </div>
-                </div>
-            <?php endif; ?>
-            
-            <!-- Back button always shows -->
-            <button class="button button-back" id="back-btn" onclick="go_back()">
-                <?php esc_html_e( 'Back', 'disciple_tools' ); ?>
-            </button>
-        </div>
+        <button class="link-button" onclick="go_back()">
+            <dt-icon icon="mdi:chevron-left"></dt-icon>
+            <?php esc_html_e( 'Back', 'disciple_tools' ); ?>
+        </button>
     </div>
     <div class="slider-viewport">
         <div id="slider-track" class="grid-x grid-margin-x">
             <section id="section-journey-details" class="medium-7 small-12 cell">
                 <div class="bordered-box">
+                    <div class="title-row">
                     <h6 class="journey-header"><?php esc_html_e( 'Journey Details', 'disciple_tools' ); ?></h6>
+                        <?php if ( empty( $journey_id ) ) : ?>
+                            <div class="split-button-wrapper" id="save-split-button">
+                                <button type="submit" form="journey-form" class="button split-main-btn" id="save-btn">
+                                    <span id="top-btn-label"><?php esc_html_e( 'Save & Go Back', 'disciple_tools' ); ?></span>
+                                </button>
+                                <button class="button split-toggle-btn" type="button" onclick="toggle_save_dropdown(event)">
+                                    <dt-icon icon="mdi:chevron-down" id="top-icon"></dt-icon>
+                                </button>
+                                <div class="split-dropdown-menu top" id="save-dropdown-top">
+                                    <button type="button" class="dropdown-item" onclick="select_save_mode('continue')">
+                                        <?php esc_html_e( 'Save & Continue', 'disciple_tools' ); ?>
+                                    </button>
+                                    <button type="button" class="dropdown-item" onclick="select_save_mode('add_new')">
+                                        <?php esc_html_e( 'Save & Add New', 'disciple_tools' ); ?>
+                                    </button>
+                                    <button type="button" class="dropdown-item" onclick="select_save_mode('go_back')">
+                                        <?php esc_html_e( 'Save & Go Back', 'disciple_tools' ); ?>
+                                    </button>
+                                </div>
+                            </div>
+                        <?php endif; ?>
+                    </div>
                     <form id="journey-form" onsubmit="save_journey(event)">
                         <div class="margin-top-1 fields-container">
                             <?php
@@ -130,17 +141,38 @@ usort( $stages, function ( $a, $b ) {
                                 $display_settings = $field_options;
                                 $display_settings[ $field_key ]['required'] = $is_required;
 
-                                echo '<div style="margin-bottom: 15px;">';
                                 render_field_for_display( $field_key, $display_settings, $journey, true, true, '', [] );
-                                if ( isset( $display_settings[ $field_key ]['required'] ) && $display_settings[ $field_key ]['required'] === true ) { ?>
-                                    <p class="help-text"
-                                    id="name-help-text"><?php esc_html_e( 'This is required', 'disciple_tools' ); ?></p>
-                                <?php }
-                                echo '</div>';
                             }
                             ?>
                         </div>
                     </form>
+                    <div class="button-container">
+                        <?php if ( ! empty( $journey_id ) ) : ?>
+                            <button class="button button-delete" onclick="delete_journey(<?php echo esc_js( $journey_id ); ?>)">
+                                <?php esc_html_e( 'Delete Journey', 'disciple_tools' ); ?>
+                            </button>
+                        <?php else : ?>
+                            <div class="split-button-wrapper" id="save-split-button">
+                                <button type="submit" form="journey-form" class="button split-main-btn" id="save-btn">
+                                    <span id="bottom-btn-label"><?php esc_html_e( 'Save & Go Back', 'disciple_tools' ); ?></span>
+                                </button>
+                                <button class="button split-toggle-btn" type="button" onclick="toggle_save_dropdown(event)">
+                                    <dt-icon icon="mdi:chevron-down" id="bottom-icon"></dt-icon>
+                                </button>
+                                <div class="split-dropdown-menu bottom" id="save-dropdown-bottom">
+                                    <button type="button" class="dropdown-item" onclick="select_save_mode('continue')">
+                                        <?php esc_html_e( 'Save & Continue', 'disciple_tools' ); ?>
+                                    </button>
+                                    <button type="button" class="dropdown-item" onclick="select_save_mode('add_new')">
+                                        <?php esc_html_e( 'Save & Add New', 'disciple_tools' ); ?>
+                                    </button>
+                                    <button type="button" class="dropdown-item" onclick="select_save_mode('go_back')">
+                                        <?php esc_html_e( 'Save & Go Back', 'disciple_tools' ); ?>
+                                    </button>
+                                </div>
+                            </div>
+                        <?php endif; ?>
+                    </div>
                 </div>
             </section>
             <section id="section-stages-list" class="medium-5 small-12 cell">
@@ -154,6 +186,10 @@ usort( $stages, function ( $a, $b ) {
                         </button>
                     </div>
                     <div>
+                        <div id="no-stages-text" class="margin-top-1">
+                            <?php esc_html_e( 'No journey stages created.', 'disciple_tools' ); ?>
+                            <button class="link-button inline" onclick="edit_stage()"><?php esc_html_e( 'Add Stage', 'disciple_tools' ); ?></button>
+                        </div>
                         <ul id="stage-list">
                             <?php foreach ( $stages as $stage ) { ?>
                             <li id="stage-<?php echo esc_attr( $stage['ID'] ); ?>" data-id="<?php echo esc_attr( $stage['ID'] ); ?>" style="border: 1px solid #ccc; padding: 1em; margin: 1em 0; display: flex; justify-content: space-between; background: #fff;">
@@ -195,7 +231,7 @@ usort( $stages, function ( $a, $b ) {
                     </div>
 
                     <div id="edit-stage-content" class="margin-top-1">
-                        <div id="new-stage-form" class="stage-edit-form">
+                        <div id="stage-form" class="stage-edit-form">
                             <div class="fields-container">
                             <?php
                             // Still need to empty the fields for Add Stage
@@ -211,15 +247,11 @@ usort( $stages, function ( $a, $b ) {
                                     $display_settings[$field_key]['display'] = 'typeahead';
                                 }
 
-                                echo '<div style="margin-bottom: 15px;">';
-
-                                render_field_for_display( $field_key, $display_settings, [], true, true, '', [] );
-
-                                echo '</div>';
+                                render_field_for_display( $field_key, $display_settings, [ 'post_type' => 'journey_stages' ], true, true, '', [] );
                             }
                             ?>
                             </div>
-                            <div class="button-container">
+                            <div id="stage-save-container" class="button-container">
                                 <button class="button button-back" onclick="close_edit()">
                                     <?php esc_html_e( 'Cancel', 'disciple_tools' ); ?>
                                 </button>
@@ -228,32 +260,6 @@ usort( $stages, function ( $a, $b ) {
                                 </button>
                             </div>
                         </div>
-
-                    <?php foreach ( $stages as $stage ) { ?>
-                        <div id="stage-form-<?php echo esc_attr( $stage['ID'] ); ?>" class="stage-edit-form fields-container" style="display: none;">
-                            <?php
-                            foreach ( $stage_fields as $field_key => $field ) {
-                                if ( empty( $field['tile'] ) || $field_key === 'journey' ) {
-                                    continue;
-                                }
-                                $is_required = ! empty( $field['required'] ) ? true : false;
-                                $display_settings = $stage_fields;
-                                $display_settings[ $field_key ]['required'] = $is_required;
-
-                                if ( ( $display_settings[$field_key]['type'] ?? '' ) === 'multi_select' ) {
-                                    $display_settings[$field_key]['display'] = 'typeahead';
-                                }
-
-                                echo '<div style="margin-bottom: 15px;">';
-
-                                render_field_for_display( $field_key, $display_settings, $stage, true, true, '', [] );
-
-                                echo '</div>';
-                            }
-                            ?>
-                            </div>
-                            <?php
-                    }?>
                     </div>
                 </div>
             </section>
@@ -265,7 +271,8 @@ usort( $stages, function ( $a, $b ) {
     .fields-container {
         display: grid;
         grid-template-columns: repeat(2, 1fr);
-        column-gap: 1.5em;
+        gap: 1rem 1.5rem;
+        margin-block-end: 1rem;
     }
 
     .slider-viewport {
@@ -341,9 +348,7 @@ usort( $stages, function ( $a, $b ) {
     .split-dropdown-menu {
         display: none;
         position: absolute;
-        top: 100%;
         right: 0;
-        margin-top: 4px;
         background-color: #ffffff;
         min-width: 170px;
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
@@ -352,7 +357,14 @@ usort( $stages, function ( $a, $b ) {
         z-index: 100;
         overflow: hidden;
     }
-
+    .split-dropdown-menu.top {
+        top: 100%;
+        margin-top: 4px;
+    }
+    .split-dropdown-menu.bottom {
+        bottom: 100%;
+        margin-bottom: 4px;
+    }
     .split-dropdown-menu.show {
         display: block;
     }
@@ -400,6 +412,26 @@ usort( $stages, function ( $a, $b ) {
     .button-back:focus {
         background-color: #f0f0f0;
         color: #000000;
+    }
+
+    .link-button {
+        background: none;
+        border: none;
+        padding-left: 0.5rem;
+        margin: 0;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+    }
+
+    .link-button dt-icon {
+        display: inline-flex;
+        align-items: center;
+        font-size: 1.25em;
+    }
+    .link-button.inline {
+        color: #0000ee;
+        text-decoration: underline;
     }
 
     .journey-header {
@@ -568,17 +600,28 @@ usort( $stages, function ( $a, $b ) {
     const journeysBaseUrl = '<?php echo esc_js( site_url( '/admin/journeys/' ) ); ?>';
     const journeyName = '<?php echo esc_js( $journey['name'] ?? $journey['post_title'] ?? 'Unknown Journey' ); ?>';
 
+    let stageTempId = 1;
+
     function updateSaveButtonUI() {
-        const labelEl = document.getElementById('save-btn-label');
+        let labelEl = document.getElementById('top-btn-label');
+        if (labelEl && SAVE_MODES[currentSaveMode]) {
+            labelEl.innerHTML = SAVE_MODES[currentSaveMode];
+        }
+        labelEl = document.getElementById('bottom-btn-label');
         if (labelEl && SAVE_MODES[currentSaveMode]) {
             labelEl.innerHTML = SAVE_MODES[currentSaveMode];
         }
     }
 
     function toggle_save_dropdown(event) {
+        const id = event.srcElement.id;
         event.stopPropagation();
-        const menu = document.getElementById('save-dropdown-menu');
-        if (menu) {
+        let menu = document.getElementById('save-dropdown-top');
+        if (menu && id === "top-icon") {
+            menu.classList.toggle('show');
+        }
+        menu = document.getElementById('save-dropdown-bottom');
+        if (menu && id === "bottom-icon") {
             menu.classList.toggle('show');
         }
     }
@@ -589,7 +632,11 @@ usort( $stages, function ( $a, $b ) {
             localStorage.setItem('dt_journey_save_action', mode);
             updateSaveButtonUI();
         }
-        const menu = document.getElementById('save-dropdown-menu');
+        let menu = document.getElementById('save-dropdown-top');
+        if (menu) {
+            menu.classList.remove('show');
+        }
+        menu = document.getElementById('save-dropdown-bottom');
         if (menu) {
             menu.classList.remove('show');
         }
@@ -598,7 +645,11 @@ usort( $stages, function ( $a, $b ) {
     // Close split dropdown on outside clicks
     document.addEventListener('click', function(e) {
         const wrapper = document.getElementById('save-split-button');
-        const menu = document.getElementById('save-dropdown-menu');
+        let menu = document.getElementById('save-dropdown-top');
+        if (menu && wrapper && !wrapper.contains(e.target)) {
+            menu.classList.remove('show');
+        }
+        menu = document.getElementById('save-dropdown-bottom');
         if (menu && wrapper && !wrapper.contains(e.target)) {
             menu.classList.remove('show');
         }
@@ -612,11 +663,17 @@ usort( $stages, function ( $a, $b ) {
 
         event.preventDefault();
 
-        const activeForm = event.target.closest('#new-stage-form');
+        const activeForm = event.target.closest('#stage-form');
 
         if (!activeForm) {
             console.error("Could not find the active stage form.");
             return;
+        }
+
+        let nextStageOrder = 0;
+        if (stages && stages.length > 0) {
+            const currentOrders = stages.map(stage => parseInt(stage.stage_order || 0));
+            nextStageOrder = Math.max(...currentOrders) + 1;
         }
 
         const stageFields = <?php
@@ -628,6 +685,7 @@ usort( $stages, function ( $a, $b ) {
         ?>;
 
         const payload = {};
+        payload['stage_order'] = nextStageOrder;
 
         for ( const [fieldKey, fieldType] of Object.entries(stageFields) ) {
             const el = activeForm.querySelector(`[id="${fieldKey}"]`);
@@ -639,42 +697,80 @@ usort( $stages, function ( $a, $b ) {
                 ];
             }
             if ( ! el ) continue;
-
+            if (fieldKey === 'attachments' && !el.value) {
+                continue
+            }
             payload[fieldKey] = el.value;
         }
 
-       try {
-            let response = await fetch(window.journey_details_js.rest_endpoint + `journeys/stage`, {
-                method: 'POST',
-                headers: {
-                'Content-Type': 'application/json',
-                'X-WP-Nonce': window.wpApiShare.nonce,
-                },
-                body: JSON.stringify(payload)
-            });
+        if (journeyId > 0) {
+            try {
+                let response = await fetch(window.journey_details_js.rest_endpoint + `journeys/stage`, {
+                    method: 'POST',
+                    headers: {
+                    'Content-Type': 'application/json',
+                    'X-WP-Nonce': window.wpApiShare.nonce,
+                    },
+                    body: JSON.stringify(payload)
+                });
 
-            if (!response.ok) {
-                console.error("Create Stage Error:", await response.text());
-                return;
+                let result = await response.json();
+
+                if (response.ok) {
+                    const newId = result.id || result.ID;
+                    if (newId) {
+                        render_new_stage(newId, payload);
+                    }
+
+                    currentStageId = null;
+                }
+            } catch (error) {
+                console.error("Create Stage Error:", error);
             }
-
-            close_edit();
-        } catch (error) {
-            console.error("Create Stage Error:", error);
+        } else {
+            payload.temp_id = stageTempId;
+            stageTempId += 1;
+            render_new_stage(payload.temp_id, payload);
         }
+        close_edit();
     }
 
+    let currentStageId = null;
+    window.stages = <?php echo wp_json_encode( $stages ); ?>;
+    let stages = window.stages;
+
     function edit_stage(stage_id) {
+        if (currentStageId !== null && currentStageId !== stage_id) {
+            sync_stage_list();
+        }
+
         const titleEl = document.getElementById('edit-section-title');
+        const activeForm = document.getElementById('stage-form');
+        const stageFields = <?php echo wp_json_encode( array_keys( $stage_fields ) ); ?>;
+        currentStageId = stage_id || null;
 
         document.querySelectorAll('.stage-edit-form').forEach(function(form) {
             form.style.display = 'none';
         });
 
-        if (stage_id) {
-            if (titleEl) titleEl.innerText = 'Edit Stage';
+        if (activeForm) {
+            activeForm.querySelectorAll('[post-id]').forEach(el => {
+                el.setAttribute('post-id', currentStageId);
+            });
+        }
 
-            const activeForm = document.getElementById('stage-form-' + stage_id);
+        if (stage_id) {
+            document.querySelector('#stage-save-container').style.display = 'none';
+            if (titleEl) titleEl.innerText = 'Edit Stage';
+            const stageData = stages.find(s => s.ID == stage_id);
+
+            stageFields.forEach(fieldKey => {
+                const el = activeForm.querySelector(`[id="${fieldKey}"]`);
+                if (el) {
+                    el.value = stageData[fieldKey] !== undefined ? stageData[fieldKey] : '';
+                }
+            });
+
             if (activeForm) activeForm.style.display = 'grid';
 
             if (window.componentService) {
@@ -683,10 +779,15 @@ usort( $stages, function ( $a, $b ) {
             }
 
         } else {
+            document.querySelector('#stage-save-container').style.display = 'flex';
             if (titleEl) titleEl.innerText = 'Add Stage';
 
-            const newForm = document.getElementById('new-stage-form');
-            if (newForm) newForm.style.display = 'grid';
+            stageFields.forEach(fieldKey => {
+                const el = activeForm.querySelector(`[id="${fieldKey}"]`);
+                if (el) el.value = '';
+            });
+
+            if (activeForm) activeForm.style.display = 'grid';
 
             if (window.componentService) {
                 window.componentService.postType = 'journey_stages';
@@ -699,6 +800,9 @@ usort( $stages, function ( $a, $b ) {
     }
 
     function close_edit() {
+        sync_stage_list();
+
+        currentStageId = null;
         document.getElementById('slider-track').classList.remove('shift-left');
 
         if (window.componentService) {
@@ -710,16 +814,41 @@ usort( $stages, function ( $a, $b ) {
     }
 
     async function delete_stage(stage_id) {
-
         const stageRow = document.getElementById(`stage-${stage_id}`);
 
-        let response = await fetch(window.journey_details_js.rest_endpoint + `journeys/stage/${stage_id}`, {
-            method: 'DELETE',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-WP-Nonce': window.wpApiShare.nonce,
-            },
-        }).then((res) => res.json()).then(() => stageRow.remove());
+        if (journeyId === 0) {
+            const index = stages.findIndex(stage => stage.ID === stage_id || stage.temp_id === stage_id);
+    
+            if (index !== -1) {
+                stages.splice(index, 1);
+            }
+
+            if (stageRow) {
+                stageRow.remove();
+            }
+
+        } else {
+            let response = await fetch(window.journey_details_js.rest_endpoint + `journeys/stage/${stage_id}`, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-WP-Nonce': window.wpApiShare.nonce,
+                },
+            });
+
+            if (response.ok) {
+                if (stageRow) {
+                    stageRow.remove();
+                }
+
+                const index = stages.findIndex(stage => stage.ID == stage_id);
+                if (index !== -1) {
+                    stages.splice(idx, 1);
+                }
+            }
+        }
+
+        toggleEmptyStageText();
     }
 
     async function delete_journey(journey_id) {
@@ -763,6 +892,8 @@ usort( $stages, function ( $a, $b ) {
             payload[fieldKey] = el.value;
         }
 
+        payload['stages'] = window.stages;
+
         try {
             let response = await fetch(window.journey_details_js.rest_endpoint + `journeys`, {
                 method: 'POST',
@@ -790,8 +921,103 @@ usort( $stages, function ( $a, $b ) {
         }
     }
 
+    function toggleEmptyStageText() {
+        const emptyMsg = document.getElementById('no-stages-text');
+        const listItems = document.querySelectorAll('#stage-list li');
+
+        if (emptyMsg) {
+            if (listItems.length > 0) {
+                emptyMsg.style.display = 'none';
+            } else {
+                emptyMsg.style.display = 'block';
+            }
+        }
+    }
+    
+    function sync_stage_list() {
+        if (currentStageId !== null && currentStageId !== 0) {
+            const activeForm = document.getElementById('stage-form');
+
+            const newName = activeForm.querySelector('[id="name"]')?.value || '';
+            const newDesc = activeForm.querySelector('[id="description"]')?.value || '';
+
+            const links = activeForm.querySelector('[id="links"]')?.value || [];
+            const attachments = activeForm.querySelector('[id="attachments"]')?.value || [];
+            const related_fields = activeForm.querySelector('[id="related_fields"]')?.value || [];
+
+            const linksCount = Array.isArray(links) ? links.length : 0;
+            const attachmentsCount = Array.isArray(attachments) ? attachments.length : 0;
+            const relatedCount = Array.isArray(related_fields) ? related_fields.length : 0;
+
+            const nameEl = document.getElementById(`stage-name-${currentStageId}`);
+            if (nameEl) nameEl.textContent = newName;
+
+            const descEl = document.getElementById(`stage-description-${currentStageId}`);
+            if (descEl) descEl.textContent = newDesc;
+
+            const stageFieldsEl = document.getElementById(`stage-fields-${currentStageId}`);
+            if (stageFieldsEl) stageFieldsEl.textContent = `Links: ${linksCount} Attachments: ${attachmentsCount} Related Fields: ${relatedCount}`;
+
+            stages = stages.map(stage => {
+                if (stage.ID == currentStageId) {
+                    const newStage = { ...stage };
+
+                    for (const [key, item] of Object.entries(stage)) {
+                        const el = activeForm.querySelector(`[id="${key}"]`);
+
+                        if (el && el.value !== undefined) {
+                            newStage[key] = el.value;
+                        }
+                    }
+
+                    return newStage;
+                }
+                return stage;
+            });
+
+            window.stages = stages;
+        }
+    }
+
+    function render_new_stage(stageId, payload) {
+        const template = document.getElementById('stage-row-template');
+        const clone = template.content.cloneNode(true); // true means clone all children
+
+        const li = clone.querySelector('li');
+        li.id = `stage-${stageId}`;
+        li.setAttribute('data-id', stageId);
+
+        const nameEl = clone.querySelector('.stage-name');
+        nameEl.id = `stage-name-${stageId}`;
+        nameEl.textContent = payload.name || 'New Stage';
+
+        const descEl = clone.querySelector('.stage-description');
+        descEl.id = `stage-description-${stageId}`;
+        descEl.textContent = payload.description || '';
+
+        const links = payload.links?.value ?? payload.links ?? [];
+        const linksCount = Array.isArray(links) ? links.length : 0;
+        const attachmentsCount = Array.isArray(payload.attachments) ? payload.attachments.length : 0;
+        const relatedCount = Array.isArray(payload.related_fields) ? payload.related_fields.length : 0;
+
+        const fieldsEl = clone.querySelector('.stage-fields');
+        fieldsEl.id = `stage-fields-${stageId}`;
+        fieldsEl.textContent = `Links: ${linksCount} Attachments: ${attachmentsCount} Related Fields: ${relatedCount}`;
+
+        clone.querySelector('.edit-btn').setAttribute('onclick', `edit_stage(${stageId})`);
+        clone.querySelector('.delete-btn').setAttribute('onclick', `delete_stage(${stageId})`);
+
+        document.getElementById('stage-list').appendChild(clone);
+
+        toggleEmptyStageText();
+
+        payload.ID = stageId;
+        stages.push(payload);
+    }
+
     document.addEventListener('DOMContentLoaded', function() {
         updateSaveButtonUI();
+        toggleEmptyStageText();
 
         const currentPostType = 'journeys'; // Hardcoded since this is the Journeys admin page
         
@@ -811,19 +1037,36 @@ usort( $stages, function ( $a, $b ) {
             window.componentService = service;
         }
 
-        const stageForm = document.getElementById('new-stage-form');
+        const stageForm = document.getElementById('stage-form');
         if (stageForm) {
-            ['input', 'change', 'blur'].forEach(eventType => {
-                stageForm.addEventListener(eventType, function(e) {
-                    if (window.componentService && window.componentService.postId === 0) {
-                        e.stopImmediatePropagation();
-                    }
-                }, true);
-            });
+            stageForm.addEventListener('change', function(e) {
+                if (window.componentService && window.componentService.postId === 0) {
+                    e.stopImmediatePropagation();
+                }
+            }, true);
         }
 
     });
 </script>
+
+<template id="stage-row-template">
+    <li data-id="" style="border: 1px solid #ccc; padding: 1em; margin: 1em 0; display: flex; justify-content: space-between; background: #fff;">
+        <div class="item-details">
+            <div class="stage-order">
+                <dt-icon class="drag-handle" icon="mdi:reorder-horizontal"></dt-icon>
+            </div>
+            <div class="stage-data">
+                <div class="stage-name" class="stage-name"></div>
+                <div class="stage-description" class="stage-description"></div>
+                <div class="stage-fields" class="stage-fields"></div>
+            </div>
+        </div>
+        <div class="stage-actions">
+            <button class="icon-btn edit-btn"><dt-icon icon="mdi:edit"></dt-icon></button>
+            <button class="icon-btn delete-btn"><dt-icon icon="mdi:delete"></dt-icon></button>
+        </div>
+    </li>
+</template>
 
 <?php
 // Load the Disciple.Tools footer
