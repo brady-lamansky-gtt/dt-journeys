@@ -141,7 +141,7 @@ unset( $stage );
                                 $display_settings = $field_options;
                                 $display_settings[ $field_key ]['required'] = $is_required;
 
-                                render_field_for_display( $field_key, $display_settings, $journey, true, true, '', [] );
+                                render_field_for_display( $field_key, $display_settings, $journey, true, true, $journey_id, [] );
                             }
                             ?>
                         </div>
@@ -177,6 +177,9 @@ unset( $stage );
             </section>
             <section id="section-stages-list" class="medium-5 small-12 cell">
                 <div class="bordered-box">
+                    <div class="error-container" id="stage-error-container" style="display: none;">
+                        <div class="error-message" id="stage-error-message"></div>
+                    </div>
                     <div class="title-row">
                         <div class="stage-list-header" id="stage-list-header">
                             <h6 class="journey-header"><?php esc_html_e( 'Stages', 'disciple_tools' ); ?></h6>
@@ -231,7 +234,7 @@ unset( $stage );
                     </div>
 
                     <div id="edit-stage-content" class="margin-top-1">
-                        <div id="stage-form" class="stage-edit-form">
+                        <form id="stage-form" class="stage-edit-form" onsubmit="save_stage(event)">
                             <div class="fields-container">
                             <?php
                             // Still need to empty the fields for Add Stage
@@ -252,14 +255,14 @@ unset( $stage );
                             ?>
                             </div>
                             <div id="stage-save-container" class="button-container">
-                                <button class="button button-back" onclick="close_edit()">
+                                <button type="button" class="button button-back" onclick="close_edit()">
                                     <?php esc_html_e( 'Cancel', 'disciple_tools' ); ?>
                                 </button>
-                                <button class="button" onclick="save_stage(event)">
+                                <button type="submit" class="button">
                                     <?php esc_html_e( 'Save Stage', 'disciple_tools' ); ?>
                                 </button>
                             </div>
-                        </div>
+                        </form>
                     </div>
                 </div>
             </section>
@@ -268,6 +271,16 @@ unset( $stage );
 </div>
 
 <style>
+    .error-container {
+        background-color: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+        padding: 0.75rem 1rem;
+        border-radius: 5px;
+        margin-bottom: 1rem;
+    }
+    .error-message {
+    }
     .fields-container {
         display: grid;
         grid-template-columns: repeat(2, 1fr);
@@ -660,6 +673,7 @@ unset( $stage );
     }
 
     async function save_stage(event) {
+        hideError();
 
         event.preventDefault();
 
@@ -670,10 +684,20 @@ unset( $stage );
             return;
         }
 
-        let nextStageOrder = 0;
-        if (stages && stages.length > 0) {
-            const currentOrders = stages.map(stage => parseInt(stage.stage_order || 0));
-            nextStageOrder = Math.max(...currentOrders) + 1;
+        // Determine if we are updating an existing stage or creating a new one
+        const isUpdating = journeyId == 0 && currentStageId !== null && currentStageId !== 0;
+
+        const payload = {};
+
+        if (isUpdating) {
+            payload.ID = currentStageId;
+        } else {
+            let nextStageOrder = 0;
+            if (stages && stages.length > 0) {
+                const currentOrders = stages.map(stage => parseInt(stage.stage_order || 0));
+                nextStageOrder = Math.max(...currentOrders) + 1;
+            }
+            payload['stage_order'] = nextStageOrder;
         }
 
         const stageFields = <?php
@@ -683,9 +707,6 @@ unset( $stage );
 
         echo wp_json_encode( $js_fields );
         ?>;
-
-        const payload = {};
-        payload['stage_order'] = nextStageOrder;
 
         for ( const [fieldKey, fieldType] of Object.entries(stageFields) ) {
             const el = activeForm.querySelector(`[id="${fieldKey}"]`);
@@ -714,25 +735,31 @@ unset( $stage );
                     body: JSON.stringify(payload)
                 });
 
-                let result = await response.json();
-
                 if (response.ok) {
+                    let result = await response.json();
+
                     const newId = result.id || result.ID;
                     if (newId) {
                         render_new_stage(newId, payload);
                     }
+                    close_edit();
+                } else {
+                    let result = await response.json();
 
-                    currentStageId = null;
+                    showError(result.message || 'Failed to save stage');
                 }
             } catch (error) {
-                console.error("Create Stage Error:", error);
+                console.error("Create/Update Stage Error:", error);
+                showError('An error occurred while saving the stage. Please try again.');
             }
-        } else {
+        } else if (!isUpdating) {
             payload.temp_id = stageTempId;
             stageTempId += 1;
             render_new_stage(payload.temp_id, payload);
+            close_edit();
+        } else {
+            close_edit();
         }
-        close_edit();
     }
 
     let currentStageId = null;
@@ -740,13 +767,12 @@ unset( $stage );
     let stages = window.stages;
 
     function edit_stage(stage_id) {
-        if (currentStageId !== null && currentStageId !== stage_id) {
+        if (journeyId > 0 && currentStageId !== null && currentStageId !== stage_id) {
             sync_stage_list();
         }
 
         const titleEl = document.getElementById('edit-section-title');
         const activeForm = document.getElementById('stage-form');
-        const stageFields = <?php echo wp_json_encode( array_keys( $stage_fields ) ); ?>;
         currentStageId = stage_id || null;
 
         document.querySelectorAll('.stage-edit-form').forEach(function(form) {
@@ -757,21 +783,31 @@ unset( $stage );
             activeForm.querySelectorAll('[post-id]').forEach(el => {
                 el.setAttribute('post-id', currentStageId);
             });
+
+            for (const formField of activeForm) {
+                if ( formField.tagName.startsWith('DT-') ) {
+                    formField.reset();
+                }
+            }
         }
 
         if (stage_id) {
-            document.querySelector('#stage-save-container').style.display = 'none';
+            if (journeyId == 0) {
+                document.querySelector('#stage-save-container').style.display = 'flex';
+            } else {
+                document.querySelector('#stage-save-container').style.display = 'none';
+            }
             if (titleEl) titleEl.innerText = 'Edit Stage';
             const stageData = stages.find(s => s.ID == stage_id);
 
-            stageFields.forEach(fieldKey => {
-                const el = activeForm.querySelector(`[id="${fieldKey}"]`);
-                if (el) {
-                    el.value = stageData[fieldKey] !== undefined ? stageData[fieldKey] : '';
+            if (activeForm) {
+                for (const formField of activeForm) {
+                    if (formField.id) {
+                        formField.value = stageData[formField.id] !== undefined ? stageData[formField.id] : '';
+                    }
                 }
-            });
-
-            if (activeForm) activeForm.style.display = 'grid';
+                activeForm.style.display = 'grid';
+            }
 
             if (window.componentService) {
                 window.componentService.postType = 'journey_stages';
@@ -781,11 +817,6 @@ unset( $stage );
         } else {
             document.querySelector('#stage-save-container').style.display = 'flex';
             if (titleEl) titleEl.innerText = 'Add Stage';
-
-            stageFields.forEach(fieldKey => {
-                const el = activeForm.querySelector(`[id="${fieldKey}"]`);
-                if (el) el.value = '';
-            });
 
             if (activeForm) activeForm.style.display = 'grid';
 
@@ -814,6 +845,8 @@ unset( $stage );
     }
 
     async function delete_stage(stage_id) {
+        hideError();
+
         const stageRow = document.getElementById(`stage-${stage_id}`);
 
         if (journeyId === 0) {
@@ -828,23 +861,34 @@ unset( $stage );
             }
 
         } else {
-            let response = await fetch(window.journey_details_js.rest_endpoint + `journeys/stage/${stage_id}`, {
-                method: 'DELETE',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-WP-Nonce': window.wpApiShare.nonce,
-                },
-            });
+            try {
+                let response = await fetch(window.journey_details_js.rest_endpoint + `journeys/stage/${stage_id}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-WP-Nonce': window.wpApiShare.nonce,
+                    },
+                });
 
-            if (response.ok) {
-                if (stageRow) {
-                    stageRow.remove();
-                }
+                if (response.ok) {
+                    let result = await response.json();
 
-                const index = stages.findIndex(stage => stage.ID == stage_id);
-                if (index !== -1) {
-                    stages.splice(idx, 1);
+                    if (stageRow) {
+                        stageRow.remove();
+                    }
+
+                    const index = stages.findIndex(stage => stage.ID == stage_id);
+                    if (index !== -1) {
+                        stages.splice(index, 1);
+                    }
+                } else {
+                    let result = await response.json();
+
+                    showError(result.message || 'Failed to delete stage');
                 }
+            } catch (error) {
+                console.error("Delete Stage Error:", error);
+                showError('An error occurred while deleting the stage. Please try again.');
             }
         }
 
@@ -862,17 +906,21 @@ unset( $stage );
                 },
             });
 
-            let result = await response.json();
-
             if (response.ok) {
                 window.location.href = journeysBaseUrl;
+            } else {
+                let result = await response.json();
+                showError(result.message || 'Failed to delete journey');
             }
         } catch (error) {
             console.error("Delete Journey Error:", error);
+            showError('An error occurred while deleting the journey. Please try again.');
         }
     }
 
     async function save_journey(event) {
+        hideError();
+
         event.preventDefault();
 
         const journeyFields = <?php
@@ -904,20 +952,28 @@ unset( $stage );
                 body: JSON.stringify(payload)
             });
 
-            let result = await response.json();
+            if (response.ok) {
 
-            const newId = result.ID || '';
+                let result = await response.json();
 
-            if (currentSaveMode === 'continue' && newId) {
-                window.location.href = `${journeysBaseUrl}${newId}/`;
-            } else if (currentSaveMode === 'add_new') {
-                window.location.href = `${journeysBaseUrl}new/`;
+                const newId = result.ID || '';
+
+                if (currentSaveMode === 'continue' && newId) {
+                    window.location.href = `${journeysBaseUrl}${newId}/`;
+                } else if (currentSaveMode === 'add_new') {
+                    window.location.href = `${journeysBaseUrl}new/`;
+                } else {
+                    // Default: 'go_back'
+                    window.location.href = journeysBaseUrl;
+                }
             } else {
-                // Default: 'go_back'
-                window.location.href = journeysBaseUrl;
+                let result = await response.json();
+
+                showError(result.message || 'Failed to save journey');
             }
         } catch (error) {
             console.error("Create Journey Error:", error);
+            showError('An error occurred while saving the journey. Please try again.');
         }
     }
 
@@ -942,10 +998,11 @@ unset( $stage );
             const newDesc = activeForm.querySelector('[id="description"]')?.value || '';
 
             const links = activeForm.querySelector('[id="links"]')?.value || [];
+            const validLinks = Array.isArray(links) ? links.filter(item => item.value && item.value.trim() !== '') : [];
             const attachments = activeForm.querySelector('[id="attachments"]')?.value || [];
             const related_fields = activeForm.querySelector('[id="related_fields"]')?.value || [];
 
-            const linksCount = Array.isArray(links) ? links.length : 0;
+            const linksCount = Array.isArray(validLinks) ? validLinks.length : 0;
             const attachmentsCount = Array.isArray(attachments) ? attachments.length : 0;
             const relatedCount = Array.isArray(related_fields) ? related_fields.length : 0;
 
@@ -996,7 +1053,8 @@ unset( $stage );
         descEl.textContent = payload.description || '';
 
         const links = payload.links?.value ?? payload.links ?? [];
-        const linksCount = Array.isArray(links) ? links.length : 0;
+        const validLinks = Array.isArray(links) ? links.filter(item => item.value && item.value.trim() !== '') : [];
+        const linksCount = Array.isArray(validLinks) ? validLinks.length : 0;
         const attachmentsCount = Array.isArray(payload.attachments) ? payload.attachments.length : 0;
         const relatedCount = Array.isArray(payload.related_fields) ? payload.related_fields.length : 0;
 
@@ -1013,6 +1071,20 @@ unset( $stage );
 
         payload.ID = stageId;
         stages.push(payload);
+    }
+
+    function showError(message) {
+        const container = document.getElementById('stage-error-container');
+        const msgBlock = document.getElementById('stage-error-message');
+        if (container && msgBlock) {
+            msgBlock.innerText = message;
+            container.style.display = 'block';
+        }
+    }
+    
+    function hideError() {
+        const container = document.getElementById('stage-error-container');
+        if (container) container.style.display = 'none';
     }
 
     document.addEventListener('DOMContentLoaded', function() {

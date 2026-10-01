@@ -71,16 +71,6 @@ class Dt_Journeys_Endpoints {
         ] );
 
         register_rest_route(
-            $namespace, '/journeys', [
-                [
-                    'methods'  => 'GET',
-                    'callback' => [ $this, 'get_journeys_endpoint' ],
-                    'permission_callback' => '__return_true',
-                ],
-            ]
-        );
-
-        register_rest_route(
             $namespace, '/journeys/(?P<id>\d+)', [
                 [
                     'methods'  => 'DELETE',
