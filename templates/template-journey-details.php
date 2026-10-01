@@ -177,9 +177,7 @@ unset( $stage );
             </section>
             <section id="section-stages-list" class="medium-5 small-12 cell">
                 <div class="bordered-box">
-                    <div class="error-container" id="stage-error-container" style="display: none;">
-                        <div class="error-message" id="stage-error-message"></div>
-                    </div>
+                    <span class="error-text" id="stage-error-message" style="display: none;"></span>
                     <div class="title-row">
                         <div class="stage-list-header" id="stage-list-header">
                             <h6 class="journey-header"><?php esc_html_e( 'Stages', 'disciple_tools' ); ?></h6>
@@ -271,16 +269,6 @@ unset( $stage );
 </div>
 
 <style>
-    .error-container {
-        background-color: #f8d7da;
-        color: #721c24;
-        border: 1px solid #f5c6cb;
-        padding: 0.75rem 1rem;
-        border-radius: 5px;
-        margin-bottom: 1rem;
-    }
-    .error-message {
-    }
     .fields-container {
         display: grid;
         grid-template-columns: repeat(2, 1fr);
@@ -684,7 +672,6 @@ unset( $stage );
             return;
         }
 
-        // Determine if we are updating an existing stage or creating a new one
         const isUpdating = journeyId == 0 && currentStageId !== null && currentStageId !== 0;
 
         const payload = {};
@@ -1074,17 +1061,16 @@ unset( $stage );
     }
 
     function showError(message) {
-        const container = document.getElementById('stage-error-container');
-        const msgBlock = document.getElementById('stage-error-message');
-        if (container && msgBlock) {
-            msgBlock.innerText = message;
-            container.style.display = 'block';
+        const errorMessage = document.getElementById('stage-error-message');
+        if (errorMessage) {
+            errorMessage.innerText = 'Error: ' + message;
+            errorMessage.style.display = 'block';
         }
     }
     
     function hideError() {
-        const container = document.getElementById('stage-error-container');
-        if (container) container.style.display = 'none';
+        const errorMessage = document.getElementById('stage-error-message');
+        if (errorMessage) errorMessage.style.display = 'none';
     }
 
     document.addEventListener('DOMContentLoaded', function() {
