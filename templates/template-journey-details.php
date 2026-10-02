@@ -3,7 +3,6 @@
  * Template Name: Journeys Admin Page
  */
 
-get_header();
 $journey_id = get_query_var( 'dt_journey_id' );
 
 $post_settings = DT_Posts::get_post_settings( 'journeys' );
@@ -76,6 +75,37 @@ foreach ( $stages as &$stage ) {
 }
 unset( $stage );
 
+function scripts( $stage_fields, $field_options, $stages ) {
+    $stage_js_fields = array_map( function( $field ) {
+        return $field['type'] ?? 'text';
+    }, $stage_fields );
+
+    $journey_js_fields = array_map( function( $field ) {
+        return $field['type'] ?? 'text';
+    }, $field_options );
+
+    wp_enqueue_script( 'journey_details_js', plugin_dir_url( __FILE__ ) . 'templates/journey-details.js', [ 'jquery' ], '1.0', true );
+
+    wp_localize_script( 'journey_details_js', 'dtJourneyData', [
+        'journeysBaseUrl' => site_url( '/admin/journeys/' ),
+        'journeyName'     => $journey['name'] ?? $journey['post_title'] ?? 'Unknown Journey',
+        'stages'          => $stages,
+        'stageFields'     => $stage_js_fields,
+        'journeyFields'   => $journey_js_fields,
+        'i18n'            => [
+            'continue' => __( 'Save & Continue', 'disciple_tools' ),
+            'add_new'  => __( 'Save & Add New', 'disciple_tools' ),
+            'go_back'  => __( 'Save & Go Back', 'disciple_tools' )
+        ]
+    ] );
+}
+
+add_action( 'wp_enqueue_scripts', function () use ( $stage_fields, $field_options, $stages ) {
+    scripts( $stage_fields, $field_options, $stages );
+}, 99 );
+
+get_header();
+
 ?>
 
 <!-- List Section -->
@@ -90,6 +120,7 @@ unset( $stage );
         <div id="slider-track" class="grid-x grid-margin-x">
             <section id="section-journey-details" class="medium-7 small-12 cell">
                 <div class="bordered-box">
+                    <span class="error-text" id="journey-detail-error" style="display: none;"></span>
                     <div class="title-row">
                     <h6 class="journey-header"><?php esc_html_e( 'Journey Details', 'disciple_tools' ); ?></h6>
                         <?php if ( empty( $journey_id ) ) : ?>
@@ -141,7 +172,7 @@ unset( $stage );
                                 $display_settings = $field_options;
                                 $display_settings[ $field_key ]['required'] = $is_required;
 
-                                render_field_for_display( $field_key, $display_settings, $journey, true, true, $journey_id, [] );
+                                render_field_for_display( $field_key, $display_settings, $journey, true, true, 'journey_', [] );
                             }
                             ?>
                         </div>
@@ -177,7 +208,7 @@ unset( $stage );
             </section>
             <section id="section-stages-list" class="medium-5 small-12 cell">
                 <div class="bordered-box">
-                    <span class="error-text" id="stage-error-message" style="display: none;"></span>
+                    <span class="error-text" id="stage-list-error" style="display: none;"></span>
                     <div class="title-row">
                         <div class="stage-list-header" id="stage-list-header">
                             <h6 class="journey-header"><?php esc_html_e( 'Stages', 'disciple_tools' ); ?></h6>
@@ -224,9 +255,10 @@ unset( $stage );
             </section>
             <section id="section-edit-stage" class="medium-7 small-12 cell">
                 <div class="bordered-box">
+                    <span class="error-text" id="stage-detail-error" style="display: none;"></span>
                     <div class="title-row">
                         <h6 id="edit-section-title" class="journey-header"><?php esc_html_e( 'Edit Stage', 'disciple_tools' ); ?></h6>
-                        <button class="icon-btn" onclick="close_edit()" style="transform: scale(1.2);">
+                        <button class="icon-btn" onclick="close_edit(<?php echo esc_html( $journey_id > 0 ) ?>)" style="transform: scale(1.2);">
                             <dt-icon icon="mdi:close"></dt-icon>
                         </button>
                     </div>
@@ -248,7 +280,7 @@ unset( $stage );
                                     $display_settings[$field_key]['display'] = 'typeahead';
                                 }
 
-                                render_field_for_display( $field_key, $display_settings, [ 'post_type' => 'journey_stages' ], true, true, '', [] );
+                                render_field_for_display( $field_key, $display_settings, [ 'post_type' => 'journey_stages' ], true, true, 'stage_', [] );
                             }
                             ?>
                             </div>
@@ -587,525 +619,6 @@ unset( $stage );
     }
 
 </style>
-
-<script>
-    const SAVE_MODES = {
-        continue: '<?php echo esc_js( __( 'Save & Continue', 'disciple_tools' ) ); ?>',
-        add_new:  '<?php echo esc_js( __( 'Save & Add New', 'disciple_tools' ) ); ?>',
-        go_back:  '<?php echo esc_js( __( 'Save & Go Back', 'disciple_tools' ) ); ?>'
-    };
-
-    let currentSaveMode = localStorage.getItem('dt_journey_save_action') || 'go_back';
-
-    const journeyId = <?php echo absint( $journey_id ); ?>;
-    const journeysBaseUrl = '<?php echo esc_js( site_url( '/admin/journeys/' ) ); ?>';
-    const journeyName = '<?php echo esc_js( $journey['name'] ?? $journey['post_title'] ?? 'Unknown Journey' ); ?>';
-
-    let stageTempId = 1;
-
-    function updateSaveButtonUI() {
-        let labelEl = document.getElementById('top-btn-label');
-        if (labelEl && SAVE_MODES[currentSaveMode]) {
-            labelEl.innerHTML = SAVE_MODES[currentSaveMode];
-        }
-        labelEl = document.getElementById('bottom-btn-label');
-        if (labelEl && SAVE_MODES[currentSaveMode]) {
-            labelEl.innerHTML = SAVE_MODES[currentSaveMode];
-        }
-    }
-
-    function toggle_save_dropdown(event) {
-        const id = event.srcElement.id;
-        event.stopPropagation();
-        let menu = document.getElementById('save-dropdown-top');
-        if (menu && id === "top-icon") {
-            menu.classList.toggle('show');
-        }
-        menu = document.getElementById('save-dropdown-bottom');
-        if (menu && id === "bottom-icon") {
-            menu.classList.toggle('show');
-        }
-    }
-
-    function select_save_mode(mode) {
-        if (SAVE_MODES[mode]) {
-            currentSaveMode = mode;
-            localStorage.setItem('dt_journey_save_action', mode);
-            updateSaveButtonUI();
-        }
-        let menu = document.getElementById('save-dropdown-top');
-        if (menu) {
-            menu.classList.remove('show');
-        }
-        menu = document.getElementById('save-dropdown-bottom');
-        if (menu) {
-            menu.classList.remove('show');
-        }
-    }
-
-    // Close split dropdown on outside clicks
-    document.addEventListener('click', function(e) {
-        const wrapper = document.getElementById('save-split-button');
-        let menu = document.getElementById('save-dropdown-top');
-        if (menu && wrapper && !wrapper.contains(e.target)) {
-            menu.classList.remove('show');
-        }
-        menu = document.getElementById('save-dropdown-bottom');
-        if (menu && wrapper && !wrapper.contains(e.target)) {
-            menu.classList.remove('show');
-        }
-    });
-
-    function go_back() {
-        window.location.href = journeysBaseUrl;
-    }
-
-    async function save_stage(event) {
-        hideError();
-
-        event.preventDefault();
-
-        const activeForm = event.target.closest('#stage-form');
-
-        if (!activeForm) {
-            console.error("Could not find the active stage form.");
-            return;
-        }
-
-        const isUpdating = journeyId == 0 && currentStageId !== null && currentStageId !== 0;
-
-        const payload = {};
-
-        if (isUpdating) {
-            payload.ID = currentStageId;
-        } else {
-            let nextStageOrder = 0;
-            if (stages && stages.length > 0) {
-                const currentOrders = stages.map(stage => parseInt(stage.stage_order || 0));
-                nextStageOrder = Math.max(...currentOrders) + 1;
-            }
-            payload['stage_order'] = nextStageOrder;
-        }
-
-        const stageFields = <?php
-        $js_fields = array_map( function( $field ) {
-            return $field['type'] ?? 'text';
-        }, $stage_fields );
-
-        echo wp_json_encode( $js_fields );
-        ?>;
-
-        for ( const [fieldKey, fieldType] of Object.entries(stageFields) ) {
-            const el = activeForm.querySelector(`[id="${fieldKey}"]`);
-            if (fieldKey === 'journey') {
-                payload[fieldKey] = [
-                    {
-                        "id": journeyId
-                    }
-                ];
-            }
-            if ( ! el ) continue;
-            if (fieldKey === 'attachments' && !el.value) {
-                continue
-            }
-            payload[fieldKey] = el.value;
-        }
-
-        if (journeyId > 0) {
-            try {
-                let response = await fetch(window.journey_details_js.rest_endpoint + `journeys/stage`, {
-                    method: 'POST',
-                    headers: {
-                    'Content-Type': 'application/json',
-                    'X-WP-Nonce': window.wpApiShare.nonce,
-                    },
-                    body: JSON.stringify(payload)
-                });
-
-                if (response.ok) {
-                    let result = await response.json();
-
-                    const newId = result.id || result.ID;
-                    if (newId) {
-                        render_new_stage(newId, payload);
-                    }
-                    close_edit();
-                } else {
-                    let result = await response.json();
-
-                    showError(result.message || 'Failed to save stage');
-                }
-            } catch (error) {
-                console.error("Create/Update Stage Error:", error);
-                showError('An error occurred while saving the stage. Please try again.');
-            }
-        } else if (!isUpdating) {
-            payload.temp_id = stageTempId;
-            stageTempId += 1;
-            render_new_stage(payload.temp_id, payload);
-            close_edit();
-        } else {
-            close_edit();
-        }
-    }
-
-    let currentStageId = null;
-    window.stages = <?php echo wp_json_encode( $stages ); ?>;
-    let stages = window.stages;
-
-    function edit_stage(stage_id) {
-        if (journeyId > 0 && currentStageId !== null && currentStageId !== stage_id) {
-            sync_stage_list();
-        }
-
-        const titleEl = document.getElementById('edit-section-title');
-        const activeForm = document.getElementById('stage-form');
-        currentStageId = stage_id || null;
-
-        document.querySelectorAll('.stage-edit-form').forEach(function(form) {
-            form.style.display = 'none';
-        });
-
-        if (activeForm) {
-            activeForm.querySelectorAll('[post-id]').forEach(el => {
-                el.setAttribute('post-id', currentStageId);
-            });
-
-            for (const formField of activeForm) {
-                if ( formField.tagName.startsWith('DT-') ) {
-                    formField.reset();
-                }
-            }
-        }
-
-        if (stage_id) {
-            if (journeyId == 0) {
-                document.querySelector('#stage-save-container').style.display = 'flex';
-            } else {
-                document.querySelector('#stage-save-container').style.display = 'none';
-            }
-            if (titleEl) titleEl.innerText = 'Edit Stage';
-            const stageData = stages.find(s => s.ID == stage_id);
-
-            if (activeForm) {
-                for (const formField of activeForm) {
-                    if (formField.id) {
-                        formField.value = stageData[formField.id] !== undefined ? stageData[formField.id] : '';
-                    }
-                }
-                activeForm.style.display = 'grid';
-            }
-
-            if (window.componentService) {
-                window.componentService.postType = 'journey_stages';
-                window.componentService.postId = stage_id;
-            }
-
-        } else {
-            document.querySelector('#stage-save-container').style.display = 'flex';
-            if (titleEl) titleEl.innerText = 'Add Stage';
-
-            if (activeForm) activeForm.style.display = 'grid';
-
-            if (window.componentService) {
-                window.componentService.postType = 'journey_stages';
-                window.componentService.postId = 0;
-            }
-        }
-
-        document.getElementById('slider-track').classList.add('shift-left');
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-
-    function close_edit() {
-        sync_stage_list();
-
-        currentStageId = null;
-        document.getElementById('slider-track').classList.remove('shift-left');
-
-        if (window.componentService) {
-            window.componentService.postType = 'journeys';
-            window.componentService.postId = journeyId;
-        }
-
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-
-    async function delete_stage(stage_id) {
-        hideError();
-
-        const stageRow = document.getElementById(`stage-${stage_id}`);
-
-        if (journeyId === 0) {
-            const index = stages.findIndex(stage => stage.ID === stage_id || stage.temp_id === stage_id);
-    
-            if (index !== -1) {
-                stages.splice(index, 1);
-            }
-
-            if (stageRow) {
-                stageRow.remove();
-            }
-
-        } else {
-            try {
-                let response = await fetch(window.journey_details_js.rest_endpoint + `journeys/stage/${stage_id}`, {
-                    method: 'DELETE',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-WP-Nonce': window.wpApiShare.nonce,
-                    },
-                });
-
-                if (response.ok) {
-                    let result = await response.json();
-
-                    if (stageRow) {
-                        stageRow.remove();
-                    }
-
-                    const index = stages.findIndex(stage => stage.ID == stage_id);
-                    if (index !== -1) {
-                        stages.splice(index, 1);
-                    }
-                } else {
-                    let result = await response.json();
-
-                    showError(result.message || 'Failed to delete stage');
-                }
-            } catch (error) {
-                console.error("Delete Stage Error:", error);
-                showError('An error occurred while deleting the stage. Please try again.');
-            }
-        }
-
-        toggleEmptyStageText();
-    }
-
-    async function delete_journey(journey_id) {
-
-        try {
-            let response = await fetch(window.journey_details_js.rest_endpoint + `journeys/${journey_id}`, {
-                method: 'DELETE',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-WP-Nonce': window.wpApiShare.nonce,
-                },
-            });
-
-            if (response.ok) {
-                window.location.href = journeysBaseUrl;
-            } else {
-                let result = await response.json();
-                showError(result.message || 'Failed to delete journey');
-            }
-        } catch (error) {
-            console.error("Delete Journey Error:", error);
-            showError('An error occurred while deleting the journey. Please try again.');
-        }
-    }
-
-    async function save_journey(event) {
-        hideError();
-
-        event.preventDefault();
-
-        const journeyFields = <?php
-            $js_fields = array_map( function( $field ) {
-                return $field['type'] ?? 'text';
-            }, $field_options );
-
-            echo wp_json_encode( $js_fields );
-            ?>;
-
-        const payload = {};
-
-        for ( const [fieldKey, fieldType] of Object.entries(journeyFields) ) {
-            const el = document.getElementById(fieldKey);
-            if ( ! el ) continue;
-            
-            payload[fieldKey] = el.value;
-        }
-
-        payload['stages'] = window.stages;
-
-        try {
-            let response = await fetch(window.journey_details_js.rest_endpoint + `journeys`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-WP-Nonce': window.wpApiShare.nonce,
-                },
-                body: JSON.stringify(payload)
-            });
-
-            if (response.ok) {
-
-                let result = await response.json();
-
-                const newId = result.ID || '';
-
-                if (currentSaveMode === 'continue' && newId) {
-                    window.location.href = `${journeysBaseUrl}${newId}/`;
-                } else if (currentSaveMode === 'add_new') {
-                    window.location.href = `${journeysBaseUrl}new/`;
-                } else {
-                    // Default: 'go_back'
-                    window.location.href = journeysBaseUrl;
-                }
-            } else {
-                let result = await response.json();
-
-                showError(result.message || 'Failed to save journey');
-            }
-        } catch (error) {
-            console.error("Create Journey Error:", error);
-            showError('An error occurred while saving the journey. Please try again.');
-        }
-    }
-
-    function toggleEmptyStageText() {
-        const emptyMsg = document.getElementById('no-stages-text');
-        const listItems = document.querySelectorAll('#stage-list li');
-
-        if (emptyMsg) {
-            if (listItems.length > 0) {
-                emptyMsg.style.display = 'none';
-            } else {
-                emptyMsg.style.display = 'block';
-            }
-        }
-    }
-    
-    function sync_stage_list() {
-        if (currentStageId !== null && currentStageId !== 0) {
-            const activeForm = document.getElementById('stage-form');
-
-            const newName = activeForm.querySelector('[id="name"]')?.value || '';
-            const newDesc = activeForm.querySelector('[id="description"]')?.value || '';
-
-            const links = activeForm.querySelector('[id="links"]')?.value || [];
-            const validLinks = Array.isArray(links) ? links.filter(item => item.value && item.value.trim() !== '') : [];
-            const attachments = activeForm.querySelector('[id="attachments"]')?.value || [];
-            const related_fields = activeForm.querySelector('[id="related_fields"]')?.value || [];
-
-            const linksCount = Array.isArray(validLinks) ? validLinks.length : 0;
-            const attachmentsCount = Array.isArray(attachments) ? attachments.length : 0;
-            const relatedCount = Array.isArray(related_fields) ? related_fields.length : 0;
-
-            const nameEl = document.getElementById(`stage-name-${currentStageId}`);
-            if (nameEl) nameEl.textContent = newName;
-
-            const descEl = document.getElementById(`stage-description-${currentStageId}`);
-            if (descEl) descEl.textContent = newDesc;
-
-            const stageFieldsEl = document.getElementById(`stage-fields-${currentStageId}`);
-            if (stageFieldsEl) stageFieldsEl.textContent = `Links: ${linksCount} Attachments: ${attachmentsCount} Related Fields: ${relatedCount}`;
-
-            stages = stages.map(stage => {
-                if (stage.ID == currentStageId) {
-                    const newStage = { ...stage };
-
-                    for (const [key, item] of Object.entries(stage)) {
-                        const el = activeForm.querySelector(`[id="${key}"]`);
-
-                        if (el && el.value !== undefined) {
-                            newStage[key] = el.value;
-                        }
-                    }
-
-                    return newStage;
-                }
-                return stage;
-            });
-
-            window.stages = stages;
-        }
-    }
-
-    function render_new_stage(stageId, payload) {
-        const template = document.getElementById('stage-row-template');
-        const clone = template.content.cloneNode(true); // true means clone all children
-
-        const li = clone.querySelector('li');
-        li.id = `stage-${stageId}`;
-        li.setAttribute('data-id', stageId);
-
-        const nameEl = clone.querySelector('.stage-name');
-        nameEl.id = `stage-name-${stageId}`;
-        nameEl.textContent = payload.name || 'New Stage';
-
-        const descEl = clone.querySelector('.stage-description');
-        descEl.id = `stage-description-${stageId}`;
-        descEl.textContent = payload.description || '';
-
-        const links = payload.links?.value ?? payload.links ?? [];
-        const validLinks = Array.isArray(links) ? links.filter(item => item.value && item.value.trim() !== '') : [];
-        const linksCount = Array.isArray(validLinks) ? validLinks.length : 0;
-        const attachmentsCount = Array.isArray(payload.attachments) ? payload.attachments.length : 0;
-        const relatedCount = Array.isArray(payload.related_fields) ? payload.related_fields.length : 0;
-
-        const fieldsEl = clone.querySelector('.stage-fields');
-        fieldsEl.id = `stage-fields-${stageId}`;
-        fieldsEl.textContent = `Links: ${linksCount} Attachments: ${attachmentsCount} Related Fields: ${relatedCount}`;
-
-        clone.querySelector('.edit-btn').setAttribute('onclick', `edit_stage(${stageId})`);
-        clone.querySelector('.delete-btn').setAttribute('onclick', `delete_stage(${stageId})`);
-
-        document.getElementById('stage-list').appendChild(clone);
-
-        toggleEmptyStageText();
-
-        payload.ID = stageId;
-        stages.push(payload);
-    }
-
-    function showError(message) {
-        const errorMessage = document.getElementById('stage-error-message');
-        if (errorMessage) {
-            errorMessage.innerText = 'Error: ' + message;
-            errorMessage.style.display = 'block';
-        }
-    }
-    
-    function hideError() {
-        const errorMessage = document.getElementById('stage-error-message');
-        if (errorMessage) errorMessage.style.display = 'none';
-    }
-
-    document.addEventListener('DOMContentLoaded', function() {
-        updateSaveButtonUI();
-        toggleEmptyStageText();
-
-        const currentPostType = 'journeys'; // Hardcoded since this is the Journeys admin page
-        
-        const apiNonce = window.wpApiSettings ? window.wpApiSettings.nonce : (window.wpApiShare ? window.wpApiShare.nonce : '');
-        const apiRoot = window.wpApiSettings ? window.wpApiSettings.root : (window.wpApiShare ? window.wpApiShare.root : '/wp-json/');
-
-        if (window.DtWebComponents && window.DtWebComponents.ComponentService) {
-            const service = new window.DtWebComponents.ComponentService(
-                currentPostType,
-                journeyId,
-                apiNonce,
-                apiRoot
-            );
-            
-            service.initialize();
-            
-            window.componentService = service;
-        }
-
-        const stageForm = document.getElementById('stage-form');
-        if (stageForm) {
-            stageForm.addEventListener('change', function(e) {
-                if (window.componentService && window.componentService.postId === 0) {
-                    e.stopImmediatePropagation();
-                }
-            }, true);
-        }
-
-    });
-</script>
 
 <template id="stage-row-template">
     <li data-id="" style="border: 1px solid #ccc; padding: 1em; margin: 1em 0; display: flex; justify-content: space-between; background: #fff;">
