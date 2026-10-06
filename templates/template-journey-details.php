@@ -75,7 +75,7 @@ foreach ( $stages as &$stage ) {
 }
 unset( $stage );
 
-function scripts( $stage_fields, $field_options, $stages ) {
+add_action( 'wp_enqueue_scripts', function () use ( $journey, $stage_fields, $field_options, $stages ) {
     $stage_js_fields = array_map( function( $field ) {
         return $field['type'] ?? 'text';
     }, $stage_fields );
@@ -83,8 +83,6 @@ function scripts( $stage_fields, $field_options, $stages ) {
     $journey_js_fields = array_map( function( $field ) {
         return $field['type'] ?? 'text';
     }, $field_options );
-
-    wp_enqueue_script( 'journey_details_js', plugin_dir_url( __FILE__ ) . 'templates/journey-details.js', [ 'jquery' ], '1.0', true );
 
     wp_localize_script( 'journey_details_js', 'dtJourneyData', [
         'journeysBaseUrl' => site_url( '/admin/journeys/' ),
@@ -98,10 +96,6 @@ function scripts( $stage_fields, $field_options, $stages ) {
             'go_back'  => __( 'Save & Go Back', 'disciple_tools' )
         ]
     ] );
-}
-
-add_action( 'wp_enqueue_scripts', function () use ( $stage_fields, $field_options, $stages ) {
-    scripts( $stage_fields, $field_options, $stages );
 }, 99 );
 
 get_header();
