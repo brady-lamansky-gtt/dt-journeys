@@ -560,8 +560,8 @@ get_header();
         width: 1.4rem;
     }
 
-    /* Or 39.9375em for standard mobile view */
-    @media screen and (max-width: 63.9375em) {
+    /* 39.9375em or 63.9375em for mobile views */
+    @media screen and (max-width: 39.9375em) {
 
         .button-container {
             justify-content: space-between;

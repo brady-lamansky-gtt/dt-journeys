@@ -266,6 +266,7 @@ export class JourneysTable extends LitElement {
                     let field = window.journeys_table.fields[key];
                     return html`<th
                       id="${key}"
+                      class="${field.name !== 'Name' && field.name !== 'Last Modified' ? 'mobile-hide' : ''}"
                       data-field="${key}"
                       @click="${this.sort_column}"
                       data-type="${field.type}"
@@ -290,9 +291,10 @@ export class JourneysTable extends LitElement {
                           ${this.getOrderedFields().map((key) => {
                               let field = window.journeys_table.fields[key];
 
-
                               let value = journey[key] !== undefined ? journey[key] : '';
-                              
+
+                              let cellContent = '';
+
                               if (field.type === 'date') {
                                 let lastModified = value.timestamp;
                                 let daysAgo = lastModified ? Math.floor((new Date()/1000 - new Date(lastModified)) / (60 * 60 * 24)) : null;
@@ -310,31 +312,24 @@ export class JourneysTable extends LitElement {
                                 } else {
                                   daysAgoText = 'Today';
                                 }
-                                return html`<td>${daysAgoText}</td>`;
+                                cellContent = daysAgoText;
                               }
                               else if (['key_select'].includes(field.type)) {
-                                return html`<td>${value.label}</td>`;
+                                cellContent = value.label;
                               }
                               else if (['connection'].includes(field.type) && value) {
-                                return html`<td>${value.length}</td>`;
+                                cellContent = value.length;
                               }
-                              /*
-                              else if (['multi_select', 'tags'].includes(field.type) && value) {
-                                return html`<td>
-                                  ${value.map((item) => html`<div>${item}</div>`)}
-                                </td>`;
-                              }
-                              */
                               else if (['multi_select', 'tags'].includes(field.type) && value) {
                                 const cell = `${journey.ID}-${key}`;
                                 const isExpanded = this.expanded_list[cell];
                                 if (isExpanded) {
-                                  return html`<td>
+                                  cellContent = html`
                                     ${value.map(item => html`<div>${item}</div>`)}
                                     <button class="text-button" style="font-size: 0.9em;" @click="${(e) => this.toggleCell(journey.ID, key, e)}">
                                       - Show less
                                     </button>
-                                  </td>`;
+                                  `;
                                 }
                                 else {
                                   let hoverString = '';
@@ -346,28 +341,34 @@ export class JourneysTable extends LitElement {
                                       }
                                       hoverString += value[i] + '\n';
                                     }
-                                    return html`<td>
+                                    cellContent = html`
                                       <span>${value[0]}, ${value[1]}, </span>
                                       <button class="text-button" style="font-size: 0.9em;" title=${hoverString} @click="${(e) => this.toggleCell(journey.ID, key, e)}">
-                                       +${value.length - 2} more
+                                      +${value.length - 2} more
                                       </button>
-                                    </td>`;
+                                    `;
                                   } else if (value.length === 2) {
-                                    return html`<td>${value[0]}, ${value[1]}</td>`;
+                                    cellContent = `${value[0]}, ${value[1]}`;
                                   } else {
-                                    return html`<td>${value[0]}</td>`;
+                                    cellContent = value[0] || '';
                                   }
                                 }
                               }
                               else {
-                                return html`<td>${value}</td>`;
+                                cellContent = value;
                               }
+                            
+                              return html`
+                              <td class="${field.name !== 'Name' && field.name !== 'Last Modified' ? 'mobile-hide' : ''}">
+                                ${cellContent}
+                              </td>
+                              `;
                             }
                           )}
                           <td>
-                            <button class="icon-btn" @click="${(e) => this.run_edit(e, journey.ID)}"><dt-icon icon="mdi:edit"></dt-icon></button>
-                            <button class="icon-btn" @click="${(e) => this.duplicateJourney(e, journey.ID)}"><dt-icon icon="mdi:content-duplicate"></dt-icon></button>
-                            <button class="icon-btn" @click="${(e) => this.deleteJourney(e, journey.ID)}"><dt-icon icon="mdi:delete"></dt-icon></button>
+                            <button class="icon-btn mobile-hide" @click="${(e) => this.run_edit(e, journey.ID)}"><dt-icon icon="mdi:edit"></dt-icon></button>
+                            <button class="icon-btn mobile-button" @click="${(e) => this.duplicateJourney(e, journey.ID)}"><dt-icon icon="mdi:content-duplicate"></dt-icon></button>
+                            <button class="icon-btn mobile-button" @click="${(e) => this.deleteJourney(e, journey.ID)}"><dt-icon icon="mdi:delete"></dt-icon></button>
                           </td>
                         </tr>
                       `
@@ -543,6 +544,27 @@ export class JourneysTable extends LitElement {
         .button-delete:hover {
           background-color: #f0f0f0;
           color: #ff0000;
+        }
+          
+        @media screen and (max-width: 63.9375em) {
+          .icon-btn {
+            padding-inline-start: 0;
+          }
+        }
+
+        @media screen and (max-width: 39.9375em) {
+          .mobile-hide {
+            display: none !important;
+          }
+          .icon-btn {
+            padding: .3em;
+            height: 1.7em;
+            margin: .5em;
+          }
+          .mobile-button {
+            background-color: #3f729b;
+            color: white;
+          }
         }
       `,
     ];
