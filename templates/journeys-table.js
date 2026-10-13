@@ -13,6 +13,7 @@ export class JourneysTable extends LitElement {
     total_journeys: { type: Number, state: true },
     search_filter: { type: Object, state: true },
     expanded_list: { type: Object, state: true },
+    deleting_id: { type: Number, state: true },
   };
 
   constructor() {
@@ -24,6 +25,7 @@ export class JourneysTable extends LitElement {
     this.search_filter = {};
     this.expanded_list = {};
     this.searchTimeout = null;
+    this.deleting_id = null;
 
     // Grabs the translations we localized in the PHP file
     this.translations = window.SHAREDFUNCTIONS.escapeObject(
@@ -144,6 +146,10 @@ export class JourneysTable extends LitElement {
     window.location.href = window.journeys_table.base_url + 'new/';
   }
 
+  run_import() {
+    console.log("Importing Journey");
+  }
+
   run_edit(e, journey_id) {
     e.stopPropagation();
     window.location.href = window.journeys_table.base_url + journey_id;
@@ -160,15 +166,45 @@ export class JourneysTable extends LitElement {
     }).then((res) => res.json()).then(() => this.getJourneys(this.search, this.sort));
   }
 
-  async deleteJourney(e, journey_id) {
+  deleteJourney(e, journey_id) {
     e.stopPropagation();
+    this.deleting_id = journey_id;
+    const dialog = this.shadowRoot.querySelector('#delete-dialog');
+    if (dialog) {
+      dialog.showModal();
+    }
+  }
+
+  cancelDelete() {
+    const dialog = this.shadowRoot.querySelector('#delete-dialog');
+    if (dialog) {
+      dialog.close();
+    }
+    this.deleting_id = null;
+  }
+
+  async confirmDelete() {
+    if (!this.deleting_id) return;
+
+    const journey_id = this.deleting_id;
+    this.cancelDelete();
+
     await fetch(window.journeys_table.rest_endpoint + `journeys/${journey_id}`, {
       method: 'DELETE',
       headers: {
         'Content-Type': 'application/json',
         'X-WP-Nonce': window.wpApiShare.nonce,
       },
-    }).then((res) => res.json()).then(() => this.getJourneys(this.search, this.sort));
+    })
+      .then((res) => res.json())
+      .then(() => this.getJourneys(this.search, this.sort));
+  }
+
+  handleBackdropClick(e) {
+    if (e.target.nodeName === 'DIALOG') {
+      e.stopPropagation();
+      this.cancelDelete();
+    }
   }
 
   toggleCell(journey_id, key, e) {
@@ -182,21 +218,45 @@ export class JourneysTable extends LitElement {
   }
 
   render() {
+    const showingText = (this.translations.showing_x_of_y || '')
+        .replace('%1$s', this.journeys.length)
+        .replace('%2$s', this.total_journeys);
+
+    const statusContent = this.loading 
+        ? html`<img style="height:1em;" src="${window.wpApiShare?.template_dir}/spinner.svg" alt="spinner" />`
+        : html`<span style="font-size: 14px;font-weight: normal">${showingText}</span>`;
+
     return html`
         <div id="title-row">
-            <div class="search-section">
-                <h2 class="journey-header">${this.translations.journeys} ${this.loading ? html`<img style="height:1em;" src="${window.wpApiShare.template_dir}/spinner.svg" alt="spinner" />` : html`<span style="font-size: 14px;font-weight: normal">${this.translations.showing_x_of_y.replace('%1$s', this.journeys.length).replace('%2$s', this.total_journeys)}</span>`}</h2>
-                <div class="filter-inputs">
-                  <dt-text id="search-journeys" type="search" placeholder="${this.translations.search}" @input="${e => this.search_text(e)}"></dt-text>
-                  <dt-multi-select placeholder="Category" id="category-filter" @change="${(e) => this.filter_column('journey_category', e.detail.newValue, e)}" options="${JSON.stringify(this.category_options)}"></dt-multi-select>
-                  <dt-multi-select placeholder="Roles" id="role-filter" @change="${(e) => this.filter_column('journey_roles', e.detail.newValue, e)}" options="${JSON.stringify(this.role_options)}"></dt-multi-select>
+            <h2 class="journey-header">
+              ${this.translations.journeys}
+              ${this.journeys.length === 0 ? '' : statusContent}
+            </h2>
+            ${this.journeys.length > 0
+              ? html`
+            <div id="create-button">
+              <button class="button" @click="${this.run_create}">
+                  ${this.translations.create_journey}
+              </button>
+            </div>
+            ` : ''}
+        </div>
+        ${!this.loading && this.journeys.length === 0
+          ? html`
+              <div id="no-journeys-text" class="no-journeys-text">
+                <span>No Journeys created.</span>
+                <span>Build one from scratch or import a starter preset (Seeker Path, T4T, Zúme...)</span>
+                <div class="button-container">
+                  <button class="button" @click="${this.run_create}">${this.translations.create_journey}</button>
+                  <button class="button button-import" @click="${this.run_import}">${this.translations.import_journey}</button>
                 </div>
             </div>
-            <div id="create-button">
-                <button class="button" @click="${this.run_create}">
-                    ${this.translations.create_journey}
-                </button>
-            </div>
+            `
+          : html`
+        <div class="filter-inputs">
+          <dt-text id="search-journeys" type="search" placeholder="${this.translations.search}" @input="${e => this.search_text(e)}"></dt-text>
+          <dt-multi-select placeholder="Category" id="category-filter" @change="${(e) => this.filter_column('journey_category', e.detail.newValue, e)}" options="${JSON.stringify(this.category_options)}"></dt-multi-select>
+          <dt-multi-select placeholder="Roles" id="role-filter" @change="${(e) => this.filter_column('journey_roles', e.detail.newValue, e)}" options="${JSON.stringify(this.role_options)}"></dt-multi-select>
         </div>
         <br>
         <div class="journeys-table-div" style="overflow: auto;">
@@ -206,6 +266,7 @@ export class JourneysTable extends LitElement {
                     let field = window.journeys_table.fields[key];
                     return html`<th
                       id="${key}"
+                      class="${field.name !== 'Name' && field.name !== 'Last Modified' ? 'mobile-hide' : ''}"
                       data-field="${key}"
                       @click="${this.sort_column}"
                       data-type="${field.type}"
@@ -230,9 +291,10 @@ export class JourneysTable extends LitElement {
                           ${this.getOrderedFields().map((key) => {
                               let field = window.journeys_table.fields[key];
 
-
                               let value = journey[key] !== undefined ? journey[key] : '';
-                              
+
+                              let cellContent = '';
+
                               if (field.type === 'date') {
                                 let lastModified = value.timestamp;
                                 let daysAgo = lastModified ? Math.floor((new Date()/1000 - new Date(lastModified)) / (60 * 60 * 24)) : null;
@@ -250,31 +312,24 @@ export class JourneysTable extends LitElement {
                                 } else {
                                   daysAgoText = 'Today';
                                 }
-                                return html`<td>${daysAgoText}</td>`;
+                                cellContent = daysAgoText;
                               }
                               else if (['key_select'].includes(field.type)) {
-                                return html`<td>${value.label}</td>`;
+                                cellContent = value.label;
                               }
                               else if (['connection'].includes(field.type) && value) {
-                                return html`<td>${value.length}</td>`;
+                                cellContent = value.length;
                               }
-                              /*
-                              else if (['multi_select', 'tags'].includes(field.type) && value) {
-                                return html`<td>
-                                  ${value.map((item) => html`<div>${item}</div>`)}
-                                </td>`;
-                              }
-                              */
                               else if (['multi_select', 'tags'].includes(field.type) && value) {
                                 const cell = `${journey.ID}-${key}`;
                                 const isExpanded = this.expanded_list[cell];
                                 if (isExpanded) {
-                                  return html`<td>
+                                  cellContent = html`
                                     ${value.map(item => html`<div>${item}</div>`)}
                                     <button class="text-button" style="font-size: 0.9em;" @click="${(e) => this.toggleCell(journey.ID, key, e)}">
                                       - Show less
                                     </button>
-                                  </td>`;
+                                  `;
                                 }
                                 else {
                                   let hoverString = '';
@@ -286,28 +341,34 @@ export class JourneysTable extends LitElement {
                                       }
                                       hoverString += value[i] + '\n';
                                     }
-                                    return html`<td>
+                                    cellContent = html`
                                       <span>${value[0]}, ${value[1]}, </span>
                                       <button class="text-button" style="font-size: 0.9em;" title=${hoverString} @click="${(e) => this.toggleCell(journey.ID, key, e)}">
-                                       +${value.length - 2} more
+                                      +${value.length - 2} more
                                       </button>
-                                    </td>`;
+                                    `;
                                   } else if (value.length === 2) {
-                                    return html`<td>${value[0]}, ${value[1]}</td>`;
+                                    cellContent = `${value[0]}, ${value[1]}`;
                                   } else {
-                                    return html`<td>${value[0]}</td>`;
+                                    cellContent = value[0] || '';
                                   }
                                 }
                               }
                               else {
-                                return html`<td>${value}</td>`;
+                                cellContent = value;
                               }
+                            
+                              return html`
+                              <td class="${field.name !== 'Name' && field.name !== 'Last Modified' ? 'mobile-hide' : ''}">
+                                ${cellContent}
+                              </td>
+                              `;
                             }
                           )}
                           <td>
-                            <button class="icon-btn" @click="${(e) => this.run_edit(e, journey.ID)}"><dt-icon icon="mdi:edit"></dt-icon></button>
-                            <button class="icon-btn" @click="${(e) => this.duplicateJourney(e, journey.ID)}"><dt-icon icon="mdi:content-duplicate"></dt-icon></button>
-                            <button class="icon-btn" @click="${(e) => this.deleteJourney(e, journey.ID)}"><dt-icon icon="mdi:delete"></dt-icon></button>
+                            <button class="icon-btn mobile-hide" @click="${(e) => this.run_edit(e, journey.ID)}"><dt-icon icon="mdi:edit"></dt-icon></button>
+                            <button class="icon-btn mobile-button" @click="${(e) => this.duplicateJourney(e, journey.ID)}"><dt-icon icon="mdi:content-duplicate"></dt-icon></button>
+                            <button class="icon-btn mobile-button" @click="${(e) => this.deleteJourney(e, journey.ID)}"><dt-icon icon="mdi:delete"></dt-icon></button>
                           </td>
                         </tr>
                       `
@@ -316,6 +377,28 @@ export class JourneysTable extends LitElement {
               }
           </table>
         </div>
+        <dialog 
+          id="delete-dialog" 
+          class="delete-dialog" 
+          @click="${this.handleBackdropClick}"
+        >
+          <div class="dialog-content">
+            <h3 class="dialog-title">Delete Journey?</h3>
+            <p class="dialog-message">
+              Are you sure you want to delete this journey? All of its stages will also be deleted.
+            </p>
+            <div class="dialog-actions">
+              <button class="button button-cancel" @click="${this.cancelDelete}">
+                Cancel
+              </button>
+              <button class="button button-delete" @click="${this.confirmDelete}">
+                Delete
+              </button>
+            </div>
+          </div>
+        </dialog>
+        `
+      }
     `;
   }
   
@@ -331,7 +414,6 @@ export class JourneysTable extends LitElement {
         .sortable .sorting_desc { background-image: var(--sort-desc); }
         .sortable .sorting_asc { background-image: var(--sort-asc); }
         #title-row { display: flex; justify-content: space-between; column-gap: 1em; }
-        .search-section { margin: auto 0; }
         .journey-header { margin-block-start: 0em; margin-block-end: 0.5em; }
         .filter-select { width: 100%; font-size: 14px; line-height: 2; padding: 0 24px 0 8px; min-height: 30px; border-radius: 3px; border: 1px solid #8c8f94; cursor: pointer; }
         tr.journeys_row:hover { background-color: #ddd; cursor: pointer; }
@@ -351,6 +433,33 @@ export class JourneysTable extends LitElement {
           text-decoration: underline;
         }
 
+        .button {
+          padding: 0.4em 0.75em;
+          border-radius: 5px;
+          border: 1px solid transparent;
+          cursor: pointer;
+          background-color: #3f729b;
+          color: #fefefe;
+          margin: 0;
+        }
+        .button:hover {
+          background-color: #2a4d6b;
+        }
+
+        .button-container {
+          display: flex;
+          gap: 1rem;
+          margin-top: 1rem;
+        }
+        .button-import {
+          background-color: #ffffff;
+          color: #000000;
+          border-color: #cccccc;
+        }
+        .button-import:hover {
+          background-color: #f0f0f0;
+          color: #000000;
+        }
         .icon-btn {
           background-color: transparent;
           border-width: medium;
@@ -372,6 +481,90 @@ export class JourneysTable extends LitElement {
           flex-wrap: wrap;
           gap: 1em;
           margin-top: 1em;
+        }
+
+        .no-journeys-text {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+        }
+
+        dialog.delete-dialog {
+          border: 1px solid #cccccc;
+          border-radius: .5rem;
+          padding: 0;
+          max-width: 26rem;
+          box-shadow: 0 .25rem 1rem rgba(0, 0, 0, 0.15);
+          background-color: #ffffff;
+          overflow: hidden;
+          width: 90%;
+        }
+
+        .dialog-content {
+          padding: 1.5rem;
+        }
+
+        dialog.delete-dialog::backdrop {
+          background-color: rgba(0, 0, 0, 0.4);
+          backdrop-filter: blur(2px);
+        }
+
+        .dialog-title {
+          font-weight: bold;
+          font-size: 1.25rem;
+          margin-top: 0;
+          margin-bottom: 1rem;
+        }
+
+        .dialog-message {
+          color: #555555;
+        }
+
+        .dialog-actions {
+          display: flex;
+          justify-content: flex-end;
+          gap: 0.5rem;
+        }
+
+        .button-cancel {
+          background-color: #ffffff;
+          color: #000000;
+          border: 1px solid #cccccc;
+        }
+        .button-cancel:hover {
+          background-color: #f0f0f0;
+        }
+
+        .button-delete {
+          background-color: #ffffff;
+          color: #ff0000;
+          border: 1px solid #cccccc;
+        }
+        .button-delete:hover {
+          background-color: #f0f0f0;
+          color: #ff0000;
+        }
+          
+        @media screen and (max-width: 63.9375em) {
+          .icon-btn {
+            padding-inline-start: 0;
+          }
+        }
+
+        @media screen and (max-width: 39.9375em) {
+          .mobile-hide {
+            display: none !important;
+          }
+          .icon-btn {
+            padding: .3em;
+            height: 1.7em;
+            margin: .5em;
+          }
+          .mobile-button {
+            background-color: #3f729b;
+            color: white;
+          }
         }
       `,
     ];
