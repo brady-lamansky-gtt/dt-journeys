@@ -613,24 +613,8 @@ get_header();
         }
     }
 
-    dialog.dt-delete-dialog {
-        border: 1px solid #cccccc;
-        border-radius: .5rem;
-        padding: 0;
-        max-width: 26rem;
-        box-shadow: 0 .25rem 1rem rgba(0, 0, 0, 0.15);
-        background-color: #ffffff;
-        overflow: hidden;
-        width: 90%;
-    }
-
     .dialog-content {
         padding: 1.5rem;
-    }
-
-    dialog.dt-delete-dialog::backdrop {
-        background-color: rgba(0, 0, 0, 0.4);
-        backdrop-filter: blur(2px);
     }
 
     .dialog-title {
@@ -665,10 +649,14 @@ get_header();
     </li>
 </template>
 
-<dialog id="dt-confirm-dialog" class="dt-delete-dialog">
-    <div class="dialog-content">
-        <h5 id="dialog-title" class="dialog-title">Confirm Delete</h5>
-        <p id="dialog-message" class="dialog-message">Are you sure you want to perform this action?</p>
+<dt-modal id="dt-confirm-dialog" class="dt-delete-dialog">
+    <div slot="content" class="dialog-content">
+        <h5 id="dialog-title" class="dialog-title">
+            <?php esc_html_e( 'Confirm Delete', 'disciple_tools' ); ?>
+        </h5>
+        <p id="dialog-message" class="dialog-message">
+            <?php esc_html_e( 'Are you sure you want to perform this action?', 'disciple_tools' ); ?>
+        </p>
         <div class="button-container">
             <button type="button" class="button button-back" id="dialog-cancel-btn">
                 <?php esc_html_e( 'Cancel', 'disciple_tools' ); ?>
@@ -678,7 +666,7 @@ get_header();
             </button>
         </div>
     </div>
-</dialog>
+</dt-modal>
 
 <?php
 // Load the Disciple.Tools footer
