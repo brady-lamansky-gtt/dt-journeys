@@ -171,14 +171,14 @@ export class JourneysTable extends LitElement {
     this.deleting_id = journey_id;
     const dialog = this.shadowRoot.querySelector('#delete-dialog');
     if (dialog) {
-      dialog.showModal();
+      dialog.dispatchEvent(new Event('open'));
     }
   }
 
   cancelDelete() {
     const dialog = this.shadowRoot.querySelector('#delete-dialog');
     if (dialog) {
-      dialog.close();
+      dialog.dispatchEvent(new Event('close'));
     }
     this.deleting_id = null;
   }
@@ -189,15 +189,24 @@ export class JourneysTable extends LitElement {
     const journey_id = this.deleting_id;
     this.cancelDelete();
 
-    await fetch(window.journeys_table.rest_endpoint + `journeys/${journey_id}`, {
-      method: 'DELETE',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-WP-Nonce': window.wpApiShare.nonce,
-      },
-    })
-      .then((res) => res.json())
-      .then(() => this.getJourneys(this.search, this.sort));
+    try {
+      const response = await fetch(window.journeys_table.rest_endpoint + `journeys/${journey_id}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-WP-Nonce': window.wpApiShare.nonce,
+        },
+      });
+
+      if (response.ok) {
+        await this.getJourneys(this.search, this.sort);
+      } else {
+        const errorData = await response.json();
+        console.error('Delete Journey failed:', errorData);
+      }
+    } catch (error) {
+      console.error('Delete Journey network error:', error);
+    }
   }
 
   handleBackdropClick(e) {
@@ -241,11 +250,11 @@ export class JourneysTable extends LitElement {
             </div>
             ` : ''}
         </div>
-        ${!this.loading && this.journeys.length === 0
+        ${!this.loading && !this.search && !this.search_filter && this.journeys.length === 0
           ? html`
               <div id="no-journeys-text" class="no-journeys-text">
-                <span>No Journeys created.</span>
-                <span>Build one from scratch or import a starter preset (Seeker Path, T4T, Zúme...)</span>
+                <span>${this.translations.no_journeys}</span>
+                <span>${this.translations.no_journeys_desc}</span>
                 <div class="button-container">
                   <button class="button" @click="${this.run_create}">${this.translations.create_journey}</button>
                   <button class="button button-import" @click="${this.run_import}">${this.translations.import_journey}</button>
@@ -266,7 +275,7 @@ export class JourneysTable extends LitElement {
                     let field = window.journeys_table.fields[key];
                     return html`<th
                       id="${key}"
-                      class="${field.name !== 'Name' && field.name !== 'Last Modified' ? 'mobile-hide' : ''}"
+                      class="${key !== 'name' && key !== 'last_modified' ? 'mobile-hide' : ''}"
                       data-field="${key}"
                       @click="${this.sort_column}"
                       data-type="${field.type}"
@@ -359,7 +368,7 @@ export class JourneysTable extends LitElement {
                               }
                             
                               return html`
-                              <td class="${field.name !== 'Name' && field.name !== 'Last Modified' ? 'mobile-hide' : ''}">
+                              <td class="${key !== 'name' && key !== 'last_modified' ? 'mobile-hide' : ''}">
                                 ${cellContent}
                               </td>
                               `;
@@ -377,26 +386,27 @@ export class JourneysTable extends LitElement {
               }
           </table>
         </div>
-        <dialog 
+        <dt-modal 
           id="delete-dialog" 
           class="delete-dialog" 
+          hideButton="true"
           @click="${this.handleBackdropClick}"
         >
-          <div class="dialog-content">
-            <h3 class="dialog-title">Delete Journey?</h3>
+          <div slot="content" class="dialog-content">
+            <h3 class="dialog-title">${this.translations.delete_journey}</h3>
             <p class="dialog-message">
-              Are you sure you want to delete this journey? All of its stages will also be deleted.
+              ${this.translations.delete_confirmation}
             </p>
             <div class="dialog-actions">
               <button class="button button-cancel" @click="${this.cancelDelete}">
-                Cancel
+                ${this.translations.cancel}
               </button>
               <button class="button button-delete" @click="${this.confirmDelete}">
-                Delete
+                ${this.translations.delete}
               </button>
             </div>
           </div>
-        </dialog>
+        </dt-modal>
         `
       }
     `;
@@ -490,24 +500,8 @@ export class JourneysTable extends LitElement {
           justify-content: center;
         }
 
-        dialog.delete-dialog {
-          border: 1px solid #cccccc;
-          border-radius: .5rem;
-          padding: 0;
-          max-width: 26rem;
-          box-shadow: 0 .25rem 1rem rgba(0, 0, 0, 0.15);
-          background-color: #ffffff;
-          overflow: hidden;
-          width: 90%;
-        }
-
         .dialog-content {
           padding: 1.5rem;
-        }
-
-        dialog.delete-dialog::backdrop {
-          background-color: rgba(0, 0, 0, 0.4);
-          backdrop-filter: blur(2px);
         }
 
         .dialog-title {

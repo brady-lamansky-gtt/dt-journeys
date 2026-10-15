@@ -372,8 +372,8 @@ function close_edit(isUpdating = false) {
 
 function delete_stage(stage_id) {
     confirmDeleteModal({
-        title: 'Delete Stage?',
-        message: 'Are you sure you want to delete this stage? This action cannot be undone.',
+        title: window.journey_details_js.translations.delete_stage,
+        message: window.journey_details_js.translations.delete_stage_confirmation,
         onConfirm: async () => {
             hideError();
 
@@ -431,8 +431,8 @@ function delete_stage(stage_id) {
 
 function delete_journey(journey_id) {
     confirmDeleteModal({
-        title: 'Delete Journey?',
-        message: 'Are you sure you want to delete this journey? All of its stages will also be deleted.',
+        title: window.journey_details_js.translations.delete_journey,
+        message: window.journey_details_js.translations.delete_journey_confirmation,
         onConfirm: async () => {
             try {
                 let response = await fetch(window.journey_details_js.rest_endpoint + `journeys/${journey_id}`, {
@@ -642,13 +642,13 @@ function confirmDeleteModal({ title, message, onConfirm }) {
 
     const handleConfirm = async () => {
         cleanup();
-        dialog.close();
+        dialog.dispatchEvent(new Event('close'));
         await onConfirm();
     };
 
     const handleCancel = () => {
         cleanup();
-        dialog.close();
+        dialog.dispatchEvent(new Event('close'));
     };
 
     const handleBackdropClick = (e) => {
@@ -661,6 +661,7 @@ function confirmDeleteModal({ title, message, onConfirm }) {
     confirmBtn.addEventListener('click', handleConfirm);
     cancelBtn.addEventListener('click', handleCancel);
     dialog.addEventListener('click', handleBackdropClick);
+    dialog.addEventListener('close', handleCancel);
 
-    dialog.showModal();
+    dialog.dispatchEvent(new Event('open'));
 }
