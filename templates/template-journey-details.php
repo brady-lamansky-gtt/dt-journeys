@@ -428,17 +428,7 @@ get_header();
     }
 
     .button-back {
-        background-color: #ffffff;
-        color: #000000;
-        border-color: #cccccc;
-    }
-    .button-back:hover {
-        background-color: #f0f0f0;
-        color: #000000;
-    }
-    .button-back:focus {
-        background-color: #f0f0f0;
-        color: #000000;
+        color: white;
     }
 
     .link-button {
@@ -560,6 +550,7 @@ get_header();
         width: 1.4rem;
     }
 
+    /* 39.9375em or 63.9375em for mobile views */
     @media screen and (max-width: 39.9375em) {
 
         .button-container {
@@ -612,6 +603,11 @@ get_header();
         }
     }
 
+    .dialog-content {
+        padding: 1.5rem;
+        color: #555555;
+    }
+
 </style>
 
 <template id="stage-row-template">
@@ -632,6 +628,15 @@ get_header();
         </div>
     </li>
 </template>
+
+<dt-modal title="<?php esc_html_e( 'Confirm Delete', 'disciple_tools' ); ?>" id="dt-confirm-dialog" class="dt-delete-dialog" hideButton="true" closebutton submitbutton>
+    <div slot="content" class="dialog-content">
+        <?php esc_html_e( 'Are you sure you want to perform this action?', 'disciple_tools' ); ?>
+    </div>
+    <button slot="submit-button" type="button" class="button button-delete" id="dialog-confirm-btn">
+        <?php esc_html_e( 'Delete', 'disciple_tools' ); ?>
+    </button>
+</dt-modal>
 
 <?php
 // Load the Disciple.Tools footer

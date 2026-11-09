@@ -163,10 +163,12 @@ class Dt_Journeys {
         add_filter( 'query_vars', [ $this, 'register_query_vars' ] );
         add_action( 'template_include', [ $this, 'load_journeys_template' ] );
         add_filter( 'dt_nav', function ( $nav ){
+            $can_manage_journeys = current_user_can( 'manage_journeys' ) || current_user_can( 'manage_dt' );
+
             $nav['admin']['settings']['submenu']['journeys'] = [
                 'label'  => __( 'Journeys', 'disciple_tools' ),
                 'link'   => site_url( '/admin/journeys/' ),
-                'hidden' => ( ! current_user_can( 'manage_dt' ) ),
+                'hidden' => ! $can_manage_journeys,
                 'icon'   => get_template_directory_uri() . '/dt-assets/images/settings.svg'
             ];
             return $nav;
@@ -189,25 +191,32 @@ class Dt_Journeys {
     }
 
     public function load_journeys_template( $template ) {
-        $plugin_dir = plugin_dir_path( __FILE__ );
+        $plugin_dir         = plugin_dir_path( __FILE__ );
+        $dt_journeys_page   = get_query_var( 'dt_journeys_page' );
+        $dt_journey = get_query_var( 'dt_journey' );
 
-        if ( get_query_var( 'dt_journeys_page' ) ) {
-            if ( ! current_user_can( 'manage_dt' ) ) {
-                wp_die( esc_html__( 'You do not have permission to view this page.', 'disciple_tools' ) );
+        if ( $dt_journeys_page || $dt_journey ) {
+            if ( ! current_user_can( 'manage_journeys' ) && ! current_user_can( 'manage_dt' ) ) {
+                status_header( 403 );
+                wp_die(
+                    esc_html__( 'You don\'t have access to Journeys admin.', 'disciple_tools' ),
+                    esc_html__( 'Access Denied', 'disciple_tools' ),
+                    [ 'response' => 403 ]
+                );
             }
-            $custom_template = $plugin_dir . 'templates/template-journeys.php';
-            if ( file_exists( $custom_template ) ) {
-                return $custom_template;
-            }
-        }
 
-        if ( get_query_var( 'dt_journey' ) ) {
-            if ( ! current_user_can( 'manage_dt' ) ) {
-                wp_die( esc_html__( 'You do not have permission to view this page.', 'disciple_tools' ) );
+            if ( $dt_journeys_page ) {
+                $custom_template = $plugin_dir . 'templates/template-journeys.php';
+                if ( file_exists( $custom_template ) ) {
+                    return $custom_template;
+                }
             }
-            $custom_template = $plugin_dir . 'templates/template-journey-details.php';
-            if ( file_exists( $custom_template ) ) {
-                return $custom_template;
+
+            if ( $dt_journey ) {
+                $custom_template = $plugin_dir . 'templates/template-journey-details.php';
+                if ( file_exists( $custom_template ) ) {
+                    return $custom_template;
+                }
             }
         }
 
@@ -246,10 +255,17 @@ class Dt_Journeys {
                     'journeys' => __( 'Journeys', 'disciple_tools' ),
                     'showing_x_of_y' => __( 'Showing %1$s of %2$s', 'disciple_tools' ),
                     'create_journey' => __( 'New Journey', 'disciple_tools' ),
+                    'import_journey' => __( 'Import Preset', 'disciple_tools' ),
+                    'no_journeys' => __( 'No Journeys created', 'disciple_tools' ),
+                    'no_journeys_desc' => __( 'Build one from scratch or import a starter preset (Seeker Path, T4T, Zúme...)', 'disciple_tools' ),
+                    'delete_journey' => __( 'Delete Journey?', 'disciple_tools' ),
+                    'delete_confirmation' => __( 'Are you sure you want to delete this journey? All of its stages will also be deleted.', 'disciple_tools' ),
+                    'cancel' => __( 'Cancel', 'disciple_tools' ),
+                    'delete' => __( 'Delete', 'disciple_tools' ),
                 ],
                 'fields' => $journey_fields,
                 'rest_endpoint' => trailingslashit( rest_url( 'dt-journeys/v1/' ) ),
-                'base_url' => trailingslashit( site_url( '/admin/journeys' ) ),
+                'base_url' => trailingslashit( site_url( '/admin/journeys/' ) ),
                 'role_options' => $role_labels,
                 'category_options' => $category_labels,
             ] );
@@ -268,10 +284,14 @@ class Dt_Journeys {
                     'edit' => __( 'Edit Journey', 'disciple_tools' ),
                     'details' => __( 'Journey Details', 'disciple_tools' ),
                     'save' => __( 'Save Journey', 'disciple_tools' ),
+                    'delete_journey' => __( 'Delete Journey?', 'disciple_tools' ),
+                    'delete_journey_confirmation' => __( 'Are you sure you want to delete this journey? All of its stages will also be deleted.', 'disciple_tools' ),
+                    'delete_stage' => __( 'Delete Stage?', 'disciple_tools' ),
+                    'delete_stage_confirmation' => __( 'Are you sure you want to delete this stage? This action cannot be undone.', 'disciple_tools' ),
                 ],
                 'fields' => $journey_fields,
                 'rest_endpoint' => trailingslashit( rest_url( 'dt-journeys/v1/' ) ),
-                'base_url' => trailingslashit( site_url( '/admin/journeys' ) ),
+                'base_url' => trailingslashit( site_url( '/admin/journeys/' ) ),
                 'journeyId' => get_query_var( 'dt_journey_id' ),
                 'ajax_url' => admin_url( 'admin-ajax.php' ),
                 'nonce'    => wp_create_nonce( 'stage_sort_nonce' )
