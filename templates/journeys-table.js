@@ -250,16 +250,13 @@ export class JourneysTable extends LitElement {
         <div id="title-row">
             <h2 class="journey-header">
               ${this.translations.journeys}
-              ${this.journeys.length === 0 ? '' : statusContent}
+              ${statusContent}
             </h2>
-            ${this.journeys.length > 0
-              ? html`
             <div id="create-button">
               <button class="button" @click="${this.run_create}">
                   ${this.translations.create_journey}
               </button>
             </div>
-            ` : ''}
         </div>
         ${!this.loading && !this.search && !hasFilters && this.journeys.length === 0
           ? html`
