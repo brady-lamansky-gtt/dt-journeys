@@ -428,17 +428,7 @@ get_header();
     }
 
     .button-back {
-        background-color: #ffffff;
-        color: #000000;
-        border-color: #cccccc;
-    }
-    .button-back:hover {
-        background-color: #f0f0f0;
-        color: #000000;
-    }
-    .button-back:focus {
-        background-color: #f0f0f0;
-        color: #000000;
+        color: white;
     }
 
     .link-button {
@@ -615,16 +605,6 @@ get_header();
 
     .dialog-content {
         padding: 1.5rem;
-    }
-
-    .dialog-title {
-        font-weight: bold;
-        font-size: 1.25rem;
-        margin-top: 0;
-        margin-bottom: 1rem;
-    }
-
-    .dialog-message {
         color: #555555;
     }
 
@@ -649,23 +629,13 @@ get_header();
     </li>
 </template>
 
-<dt-modal id="dt-confirm-dialog" class="dt-delete-dialog">
+<dt-modal title="<?php esc_html_e( 'Confirm Delete', 'disciple_tools' ); ?>" id="dt-confirm-dialog" class="dt-delete-dialog" hideButton="true" closebutton submitbutton>
     <div slot="content" class="dialog-content">
-        <h5 id="dialog-title" class="dialog-title">
-            <?php esc_html_e( 'Confirm Delete', 'disciple_tools' ); ?>
-        </h5>
-        <p id="dialog-message" class="dialog-message">
-            <?php esc_html_e( 'Are you sure you want to perform this action?', 'disciple_tools' ); ?>
-        </p>
-        <div class="button-container">
-            <button type="button" class="button button-back" id="dialog-cancel-btn">
-                <?php esc_html_e( 'Cancel', 'disciple_tools' ); ?>
-            </button>
-            <button type="button" class="button button-delete" id="dialog-confirm-btn">
-                <?php esc_html_e( 'Delete', 'disciple_tools' ); ?>
-            </button>
-        </div>
+        <?php esc_html_e( 'Are you sure you want to perform this action?', 'disciple_tools' ); ?>
     </div>
+    <button slot="submit-button" type="button" class="button button-delete" id="dialog-confirm-btn">
+        <?php esc_html_e( 'Delete', 'disciple_tools' ); ?>
+    </button>
 </dt-modal>
 
 <?php

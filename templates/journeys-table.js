@@ -235,22 +235,30 @@ export class JourneysTable extends LitElement {
         ? html`<img style="height:1em;" src="${window.wpApiShare?.template_dir}/spinner.svg" alt="spinner" />`
         : html`<span style="font-size: 14px;font-weight: normal">${showingText}</span>`;
 
+    let hasFilters = false;
+    const filters = this.search_filter;
+    for (const [key, value] of Object.entries(filters)) {
+      for (const item of value) {
+        if (item.charAt(0) !== '-') {
+          hasFilters = true;
+          break;
+        }
+      }
+    }
+
     return html`
         <div id="title-row">
             <h2 class="journey-header">
               ${this.translations.journeys}
-              ${this.journeys.length === 0 ? '' : statusContent}
+              ${statusContent}
             </h2>
-            ${this.journeys.length > 0
-              ? html`
             <div id="create-button">
               <button class="button" @click="${this.run_create}">
                   ${this.translations.create_journey}
               </button>
             </div>
-            ` : ''}
         </div>
-        ${!this.loading && !this.search && !this.search_filter && this.journeys.length === 0
+        ${!this.loading && !this.search && !hasFilters && this.journeys.length === 0
           ? html`
               <div id="no-journeys-text" class="no-journeys-text">
                 <span>${this.translations.no_journeys}</span>
@@ -387,25 +395,20 @@ export class JourneysTable extends LitElement {
           </table>
         </div>
         <dt-modal 
+          title="${this.translations.delete_journey}"
           id="delete-dialog" 
           class="delete-dialog" 
           hideButton="true"
           @click="${this.handleBackdropClick}"
+          closebutton
+          submitbutton
         >
           <div slot="content" class="dialog-content">
-            <h3 class="dialog-title">${this.translations.delete_journey}</h3>
-            <p class="dialog-message">
-              ${this.translations.delete_confirmation}
-            </p>
-            <div class="dialog-actions">
-              <button class="button button-cancel" @click="${this.cancelDelete}">
-                ${this.translations.cancel}
-              </button>
-              <button class="button button-delete" @click="${this.confirmDelete}">
-                ${this.translations.delete}
-              </button>
-            </div>
+            ${this.translations.delete_confirmation}
           </div>
+          <button slot="submit-button" class="button button-delete" @click="${this.confirmDelete}">
+            ${this.translations.delete}
+          </button>
         </dt-modal>
         `
       }
@@ -502,16 +505,6 @@ export class JourneysTable extends LitElement {
 
         .dialog-content {
           padding: 1.5rem;
-        }
-
-        .dialog-title {
-          font-weight: bold;
-          font-size: 1.25rem;
-          margin-top: 0;
-          margin-bottom: 1rem;
-        }
-
-        .dialog-message {
           color: #555555;
         }
 
@@ -519,15 +512,6 @@ export class JourneysTable extends LitElement {
           display: flex;
           justify-content: flex-end;
           gap: 0.5rem;
-        }
-
-        .button-cancel {
-          background-color: #ffffff;
-          color: #000000;
-          border: 1px solid #cccccc;
-        }
-        .button-cancel:hover {
-          background-color: #f0f0f0;
         }
 
         .button-delete {

@@ -623,21 +623,26 @@ function hideError() {
 
 function confirmDeleteModal({ title, message, onConfirm }) {
     const dialog = document.getElementById('dt-confirm-dialog');
-    const titleEl = document.getElementById('dialog-title');
-    const msgEl = document.getElementById('dialog-message');
     const confirmBtn = document.getElementById('dialog-confirm-btn');
-    const cancelBtn = document.getElementById('dialog-cancel-btn');
 
     if (!dialog) return;
 
-    titleEl.textContent = title || 'Delete Item?';
-    msgEl.textContent = message || 'Are you sure? This cannot be undone.';
+    const contentEl = dialog.querySelector('[slot="content"]');
+
+    if (title) {
+        dialog.setAttribute('title', title);
+    }
+
+    if (contentEl && message) {
+        contentEl.textContent = message;
+    }
 
     const cleanup = () => {
         confirmBtn.removeEventListener('click', handleConfirm);
-        cancelBtn.removeEventListener('click', handleCancel);
         dialog.removeEventListener('click', handleBackdropClick);
         dialog.removeEventListener('close', handleCancel);
+        dialog.removeEventListener('cancel', handleCancel);
+        document.removeEventListener('keydown', handleKeyDown);
     };
 
     const handleConfirm = async () => {
@@ -658,10 +663,17 @@ function confirmDeleteModal({ title, message, onConfirm }) {
         }
     };
 
+    const handleKeyDown = (e) => {
+        if (e.key === 'Escape' || e.keyCode === 27) {
+            handleCancel();
+        }
+    };
+
     confirmBtn.addEventListener('click', handleConfirm);
-    cancelBtn.addEventListener('click', handleCancel);
     dialog.addEventListener('click', handleBackdropClick);
     dialog.addEventListener('close', handleCancel);
+    dialog.addEventListener('cancel', handleCancel);
+    document.addEventListener('keydown', handleKeyDown);
 
     dialog.dispatchEvent(new Event('open'));
 }
